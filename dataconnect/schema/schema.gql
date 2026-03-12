@@ -1,0 +1,41 @@
+type User @table {
+  telegramId: String!
+  firstName: String
+  lastName: String
+  username: String
+  languageCode: String
+  lastInteraction: Timestamp
+  createdAt: Timestamp!
+}
+
+type Conversation @table {
+  user: User!
+  messageText: String!
+  senderType: String!
+  createdAt: Timestamp!
+}
+
+type UserPreference @table(key: ["user", "preferenceKey"]) {
+  user: User!
+  preferenceKey: String!
+  preferenceValue: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type MemoryFragment @table(key: ["user", "key"]) {
+  user: User!
+  key: String!
+  value: String!
+  context: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type Reminder @table {
+  user: User!
+  reminderText: String!
+  scheduledTime: Timestamp
+  isCompleted: Boolean
+  createdAt: Timestamp!
+}

@@ -1,0 +1,30 @@
+{
+  "name": "opengravity",
+  "version": "1.0.0",
+  "description": "Local, secure personal AI agent communicating exclusively via Telegram using long polling.",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "better-sqlite3": "^11.5.0",
+    "dotenv": "^16.4.5",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
+    "firebase-tools": "^15.9.1",
+    "grammy": "^1.32.0",
+    "openai": "^4.7.0",
+    "signal-exit": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.8.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
