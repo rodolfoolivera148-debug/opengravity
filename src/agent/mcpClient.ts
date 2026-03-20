@@ -99,27 +99,34 @@ export async function initMcpClient() {
         await mcpClient.connect(transport);
         console.log("[MCP] Conectado exitosamente al servidor MCP de Firebase.");
 
-        // Timeout de 30s para listar herramientas
+        // Timeout de 60s para listar herramientas (margen máximo de seguridad)
         const listToolsPromise = mcpClient.listTools();
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout al listar herramientas MCP")), 30000)
+            setTimeout(() => reject(new Error("Timeout al listar herramientas MCP")), 60000)
         );
 
         const toolsResponse = await Promise.race([listToolsPromise, timeoutPromise]) as any;
         
-        mcpTools = toolsResponse.tools.map((tool: any) => ({
+        const localMcpTools = toolsResponse.tools.map((tool: any) => ({
             type: "function",
             function: {
                 name: tool.name,
-                description: (tool.description || "").substring(0, 512), 
+                description: (tool.description || "").substring(0, 1024), 
                 parameters: sanitizeToolSchema(tool.inputSchema),
             }
         }));
 
-        const toolNames = mcpTools.map((t: any) => t.function.name);
-        console.log(`[MCP] Cargadas ${mcpTools.length} herramientas de Firebase.`);
+        const toolsCount = localMcpTools.length;
+        mcpTools = localMcpTools; // Assign to the global mcpTools
+        console.log(`[MCP] Cargadas ${toolsCount} herramientas de Firebase.`);
     } catch (error: any) {
-        console.warn("[MCP] No se pudieron cargar herramientas de Firebase:", error.message);
+        // Lógica de Reintento para MCP
+        if (!process.env.MCP_RETRIED) {
+            console.warn(`[MCP] Reintentando carga de herramientas... (${error.message})`);
+            process.env.MCP_RETRIED = "true";
+            return initMcpClient(); // Recursivo una sola vez
+        }
+        console.error(`[MCP] No se pudieron cargar herramientas de Firebase: ${error.message}`);
         mcpClient = null;
     }
 }

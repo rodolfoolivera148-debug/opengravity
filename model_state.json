@@ -1,0 +1,10 @@
+{
+  "llama-3.3-70b-versatile": {
+    "name": "llama-3.3-70b-versatile",
+    "provider": "groq",
+    "available": true,
+    "retryAfter": 0,
+    "remainingRequests": 999,
+    "remainingTokens": 10259
+  }
+}

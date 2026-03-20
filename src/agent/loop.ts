@@ -1,23 +1,33 @@
-// src/agent/loop.ts
-import { getLLMResponse, getModelCount } from "./llm.js";
+import { getLLMResponse, getModelCount, getInitialModelIndex } from "./llm.js";
 import { executeTool } from "./tools.js";
-import { saveMessage, getMessages } from "../memory/firestore.js";
+import { saveMessage, getMessages } from "../memory/memoryManager.js";
 
 const MAX_TOOL_ITERATIONS = 15;
 
 const SYSTEM_PROMPT = `
-Eres OpenGravity, un agente de IA personal altamente capaz, ejecutándose localmente.
-Respondes SIEMPRE en español.
-Tu interfaz principal de comunicación es Telegram.
-Tienes acceso a herramientas de terminal, lectura/escritura de archivos y memoria persistente.
-Nota: Tus herramientas de Firebase/Firestore solo están disponibles en modelos con alto contexto.
+Eres OpenGravity, un sistema de IA avanzado diseñado para actuar como un Ingeniero de Software Senior y Asistente Personal de alto nivel.
+Respondes SIEMPRE en español con un tono profesional, servicial y directo.
+
+Capacidades principales:
+1. DESARROLLO: Puedes escribir, leer y modificar código localmente con herramientas de archivos.
+2. EJECUCIÓN: Tienes acceso a una terminal de Windows para ejecutar comandos (npm, git, python, etc.).
+3. MEMORIA: Recuerdas conversaciones pasadas gracias a tu base de datos persistente.
+4. FIREBASE: Posees herramientas para interactuar con bases de datos en la nube de Google Cloud Firestore.
+
+Metodología de trabajo:
+- Antes de realizar cambios complejos en archivos, "piensa" y planifica tus acciones.
+- Eres proactivo: si el usuario te pide una aplicación, créala paso a paso sin que te lo pidan dos veces.
+- Verificación: Siempre verifica la salida de tus comandos de terminal para confirmar el éxito del proceso.
+- Privacidad: Trata la información local con seguridad.
+
+Tu entorno operativo es Windows y te comunicas a través de un Bot de Telegram.
 `;
 
 export async function runAgentLoop(userId: number, userMessage: string): Promise<string> {
     await saveMessage(userId, 'user', userMessage);
 
     let toolIterations = 0;
-    let modelIndex = 0;
+    let modelIndex = getInitialModelIndex(); // <--- Ahora es inteligente
 
     while (toolIterations < MAX_TOOL_ITERATIONS) {
         toolIterations++;
@@ -40,7 +50,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                 try {
                     const parsed = JSON.parse(msg.content);
                     let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
-                    
+
                     // Truncado más agresivo para evitar el error de 12k de Groq
                     const limit = modelIndex === 0 ? 1200 : 3000;
                     if (contentStr.length > limit) {
@@ -100,11 +110,11 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
             console.error(`[AgentLoop Error]: ${errMsg.substring(0, 200)}`);
 
             const retryCodes = ['LLM_HTTP_429', 'LLM_HTTP_413', 'LLM_HTTP_502', 'LLM_HTTP_503', 'LLM_HTTP_400', 'LLM_HTTP_404', 'LLM_BODY_ERROR', 'LLM_NO_CHOICES', 'rate_limit', 'SKIP_NO_KEY'];
-            
+
             if (retryCodes.some(code => errMsg.includes(code)) && modelIndex < getModelCount() - 1) {
                 console.log(`[AgentLoop] Fallo en el modelo actual. Cambiando al siguiente...`);
                 modelIndex++;
-                toolIterations--; 
+                toolIterations--;
                 continue;
             }
 
