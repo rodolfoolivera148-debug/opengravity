@@ -12,8 +12,6 @@ const envSchema = z.object({
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_MODEL: z.string().default("openrouter/free"),
     DB_PATH: z.string().default("./memory.db"),
-    ELEVENLABS_API_KEY: z.string().min(1),
-    ELEVENLABS_VOICE_ID: z.string().default("21m00Tcm4TlvDq8ikWAM"), // Rachel por defecto
     FIREBASE_PROJECT_ID: z.string().optional().default("opengravity-1234"),
 });
 

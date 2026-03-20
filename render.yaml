@@ -19,7 +19,4 @@ services:
         value: "openrouter/free"
       - key: DB_PATH
         value: "./memory.db"
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: ELEVENLABS_VOICE_ID
-        value: "21m00Tcm4TlvDq8ikWAM"
+

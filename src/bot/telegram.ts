@@ -29,22 +29,6 @@ bot.on("message:text", async (ctx) => {
         const response = await runAgentLoop(userId, text);
         // Enviar respuesta de texto
         await ctx.reply(response);
-
-        // Intentar enviar respuesta de voz
-        try {
-            console.log(`[Voice] Generando voz para ${userId}...`);
-            const { textToSpeech } = await import("../services/elevenlabs.js");
-            // Limpiamos el texto un poco de asteriscos y emojis para el TTS
-            const cleanText = response.replace(/[*_~`]/g, '').trim();
-            const audioBuffer = await textToSpeech(cleanText);
-
-            const { InputFile } = await import("grammy");
-            console.log(`[Voice] Audio generado (${audioBuffer.length} bytes), enviando a Telegram...`);
-            await ctx.replyWithVoice(new InputFile(audioBuffer, "voice.mp3"));
-            console.log(`[Voice] Nota de voz enviada exitosamente.`);
-        } catch (voiceError: any) {
-            console.error("[Voice Error] Fallo al generar o enviar la nota de voz:", voiceError.message);
-        }
     } catch (error: any) {
         console.error(`[Error] Fallo al procesar mensaje de ${userId}:`, error);
         await ctx.reply("❌ Ocurrió un error interno al procesar tu mensaje.");

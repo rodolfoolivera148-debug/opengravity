@@ -12,7 +12,7 @@ async function main() {
     const { initMcpClient } = await import("./agent/mcpClient.js");
     await initMcpClient();
 
-    // Manejar errores globales para evitar caídas
+    // Manejar errores de promesas globales
     process.on("unhandledRejection", (reason, promise) => {
         console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
     });
