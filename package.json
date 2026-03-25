@@ -13,6 +13,7 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "better-sqlite3": "^11.5.0",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "firebase-tools": "^15.9.1",
@@ -26,5 +27,16 @@
     "@types/node": "^22.8.1",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rodolfoolivera148-debug/opengravity.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rodolfoolivera148-debug/opengravity/issues"
+  },
+  "homepage": "https://github.com/rodolfoolivera148-debug/opengravity#readme"
 }

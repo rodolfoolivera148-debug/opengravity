@@ -1,51 +1,68 @@
+// src/index.ts
 import { env } from "./config/env.js";
 import { bot } from "./bot/telegram.js";
 import { onExit } from "signal-exit";
 
 async function main() {
-    console.log("Iniciando OpenGravity...");
+    console.log("Iniciando OpenGravity v2.0...");
 
-    // Validar conexión a Cloud Firestore
+    // 1. Validar conexión a Cloud Firestore
     await import("./config/firebase.js");
     console.log("Conectado exitosamente a Firebase Firestore.");
 
-    // Iniciar cliente MCP con reintentos internos
+    // 2. Iniciar cliente MCP con el nuevo modo silencioso
     const { initMcpClient } = await import("./agent/mcpClient.js");
     await initMcpClient();
 
-    // Pequeño buffer de respiro para que las conexiones se estabilicen
-    console.log("Conexión estabilizada, aguardando inicio de bot (5s)...");
-    await new Promise(r => setTimeout(r, 5000));
+    // 3. Buffer de seguridad extendido para evitar Conflicto 409 (Telegram)
+    // tsx --watch reinicia rápido, pero Telegram tarda en soltar la sesión antigua.
+    console.log("Conexión estabilizada. Aguardando a que instancias previas cierren (15s)...");
+    await new Promise(r => setTimeout(r, 15000));
 
-    // Asegurar que el bot se detenga limpiamente al reiniciar el proceso (tsx watch)
-    onExit(async () => {
-        console.log("Deteniendo bot de forma segura para evitar conflictos (409)...");
-        try {
-            await bot.stop();
-        } catch (e) {}
+    // 4. Asegurar detención limpia
+    onExit(() => {
+        console.log("Deteniendo bot de forma segura...");
+        void bot.stop().catch(() => {});
     });
 
-    // Manejar errores de promesas globales
-    process.on("unhandledRejection", (reason, promise) => {
-        console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
-    });
-
-    bot.catch((err) => {
-        const errMsg = err.message || "";
+    bot.catch((err: any) => {
+        const errMsg = err.description || err.message || "";
         if (errMsg.includes("Conflict")) {
-            console.error("❌ Conflicto de Bot (409): Otra instancia está activa. Reiniciando en 10s...");
-            setTimeout(() => process.exit(1), 10000);
+            console.error("❌ Conflicto 409: La sesión anterior sigue activa. Reintentando en 20s...");
+            setTimeout(() => process.exit(1), 20000);
         } else {
             console.error("❌ Error en el bot de Telegram:", err);
         }
     });
 
-    await bot.start({
-        onStart: (botInfo) => {
-            console.log(`🤖 Bot iniciado exitosamente como @${botInfo.username}`);
-            console.log(`👥 Usuarios permitidos: ${env.TELEGRAM_ALLOWED_USER_IDS.join(', ')}`);
+    // Bucle de reintentos para bot.start() en caso de Conflict 409
+    let started = false;
+    let attempts = 0;
+    while (!started && attempts < 5) {
+        try {
+            await bot.start({
+                onStart: (botInfo) => {
+                    console.log(`🚀 BOT ONLINE: @${botInfo.username}`);
+                    console.log(`🛡️ Seguridad activa. Solo usuarios permitidos.`);
+                }
+            });
+            started = true;
+        } catch (err: any) {
+            attempts++;
+            const errMsg = err.description || err.message || "";
+            if (errMsg.includes("Conflict") || errMsg.includes("409")) {
+                console.warn(`[Telegram] ⚠️ Conflicto 409 detectado (Intento ${attempts}/5). La sesión anterior en Telegram se está cerrando. Reintentando en 10s...`);
+                await new Promise(res => setTimeout(res, 10000));
+            } else {
+                console.error("❌ Error grave al iniciar el bot de Telegram:", err);
+                throw err;
+            }
         }
-    });
+    }
+
+    if (!started) {
+        throw new Error("No se pudo iniciar el bot tras 5 intentos por conflictos de sesión.");
+    }
 }
 
 main().catch((err) => {

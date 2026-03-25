@@ -1,83 +1,72 @@
+import OpenAI from "openai";
 import { env } from "../config/env.js";
-import { modelTracker } from '../memory/memoryManager.js';
+import { modelTracker } from "./modelTracker.js";
 
-/**
- * Lista de modelos priorizados y funcionales (Marzo 2026).
- */
-const MODELS = [
-    { provider: 'groq', model: 'llama-3.3-70b-versatile', baseUrl: 'https://api.groq.com/openai/v1/chat/completions' },
-    { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'google/gemma-3-27b-it:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'qwen/qwen3-coder:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'stepfun/step-3.5-flash:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'google/gemini-2.0-flash-lite-preview-02-05:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
-    { provider: 'openrouter', model: 'openrouter/free', baseUrl: 'https://openrouter.ai/api/v1/chat/completions' },
+const models = [
+    // 1. Titulares Inteligentes (Groq es ultra-rápido)
+    { name: "llama-3.3-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
+    
+    // 2. Groq Fallbacks (Sucesores de los modelos discontinuados)
+    { name: "llama-3.1-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
+    { name: "llama-3.1-8b-instant", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
+
+    // 3. OpenRouter Pesos Pesados (Gratuitos de Alta Capacidad)
+    { name: "google/gemini-2.0-flash-001:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "meta-llama/llama-3.3-70b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "qwen/qwen-2.5-72b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "deepseek/deepseek-r1:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    
+    // 4. Fallback de emergencia
+    { name: "mistralai/mistral-nemo:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
 ];
 
-export function getModelCount() {
-    return MODELS.length;
+export function getModelCount() { return models.length; }
+
+export function getInitialModelIndex() {
+    // Retorna el ID del modelo que, según nuestro rastreador en vivo, está actualmente disponible
+    return modelTracker.getBestAvailableModelIndex(models); 
 }
 
 /**
- * Retorna el primer modelo que el rastreador marque como disponible.
+ * Llama al LLM con soporte para herramientas y monitoreo automático de caídas (Status Tracker)
  */
-export function getInitialModelIndex() {
-    return modelTracker.getBestAvailableModelIndex(MODELS);
-}
+export async function getLLMResponse(messages: any[], modelIndex: number = 0, tools: any[] = []) {
+    const config = models[modelIndex];
+    if (!config.apiKey) throw new Error(`LLM_SKIP_NO_KEY: Falta API Key para ${config.name}`);
 
-export async function getLLMResponse(messages: any[], modelIndex: number = 0) {
-    if (modelIndex >= MODELS.length) {
-        throw new Error("ALL_MODELS_EXHAUSTED");
-    }
-
-    const config = MODELS[modelIndex];
-    const apiKey = config.provider === 'groq' ? env.GROQ_API_KEY : env.OPENROUTER_API_KEY;
-
-    if (!apiKey) {
-        throw new Error(`SKIP_NO_KEY_${config.provider}`);
-    }
-
-    const { getTools, getLocalTools } = await import('./tools.js');
-    const tools = config.provider === 'groq' ? getLocalTools() : getTools();
-
-    console.log(`[LLM] Intento ${modelIndex + 1}: ${config.model} | ${tools.length} tools`);
-
-    const response = await fetch(config.baseUrl, {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://opengravity.ai",
-            "X-Title": "OpenGravity Agent"
-        },
-        body: JSON.stringify({
-            model: config.model,
-            messages: messages,
-            tools: tools.length > 0 ? tools : undefined,
-            tool_choice: tools.length > 0 ? "auto" : undefined,
-            temperature: 0.3
-        })
+    const client = new OpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseURL,
     });
 
-    // ACTUALIZAR EL RASTREADOR CON LOS HEADERS DE LA RESPUESTA
-    modelTracker.updateFromHeaders(config.model, config.provider, response.headers, response.status);
+    const completionOptions: any = {
+        model: config.name,
+        messages: messages,
+        temperature: 0.1,
+    };
 
-    if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`LLM_HTTP_${response.status}: ${errorData.substring(0, 500)}`);
+    if (tools && tools.length > 0) {
+        completionOptions.tools = tools;
+        completionOptions.tool_choice = "auto";
     }
 
-    const data = await response.json();
-
-
-    if (data.error) {
-        throw new Error(`LLM_BODY_ERROR: ${JSON.stringify(data.error).substring(0, 500)}`);
+    try {
+        // Ejecutamos pasándole withResponse() para poder leer los Headers reales y dárselos al Tracker
+        const { data, response: rawResponse } = await client.chat.completions.create(completionOptions).withResponse();
+        
+        if (rawResponse.headers) {
+            modelTracker.updateFromHeaders(config.name, config.provider, rawResponse.headers as any, rawResponse.status);
+        }
+        
+        return data;
+    } catch (error: any) {
+        console.error(`[LLM Error] Provider ${config.provider} (${config.name}):`, error.message);
+        
+        // Si hay error en la red/Rate limit, alimentamos al Tracker para que bloquee el modelo temporalmente
+        if (error.status && error.headers) {
+            modelTracker.updateFromHeaders(config.name, config.provider, error.headers as any, error.status);
+        }
+        
+        throw new Error(`LLM_HTTP_${error.status || 'ERROR'}: ${error.message}`);
     }
-
-    if (!data.choices || data.choices.length === 0) {
-        throw new Error(`LLM_NO_CHOICES: ${JSON.stringify(data).substring(0, 300)}`);
-    }
-
-    return data;
 }

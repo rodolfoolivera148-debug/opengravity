@@ -2,9 +2,113 @@
   "llama-3.3-70b-versatile": {
     "name": "llama-3.3-70b-versatile",
     "provider": "groq",
+    "available": false,
+    "retryAfter": 1774418620709,
+    "remainingRequests": 999,
+    "remainingTokens": 11960
+  },
+  "meta-llama/llama-3.3-70b-instruct:free": {
+    "name": "meta-llama/llama-3.3-70b-instruct:free",
+    "provider": "openrouter",
+    "available": false,
+    "retryAfter": 1774416918775
+  },
+  "google/gemma-3-27b-it:free": {
+    "name": "google/gemma-3-27b-it:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "qwen/qwen3-coder:free": {
+    "name": "qwen/qwen3-coder:free",
+    "provider": "openrouter",
+    "available": false,
+    "retryAfter": 1774373968079
+  },
+  "stepfun/step-3.5-flash:free": {
+    "name": "stepfun/step-3.5-flash:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 1774065305281
+  },
+  "google/gemini-2.0-flash-lite-preview-02-05:free": {
+    "name": "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "deepseek/deepseek-chat:free": {
+    "name": "deepseek/deepseek-chat:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "mistralai/mistral-small-3.1-24b-instruct:free": {
+    "name": "mistralai/mistral-small-3.1-24b-instruct:free",
+    "provider": "openrouter",
+    "available": false,
+    "retryAfter": 1774065307583
+  },
+  "openrouter/free": {
+    "name": "openrouter/free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "google/gemini-2.0-pro-exp-02-05:free": {
+    "name": "google/gemini-2.0-pro-exp-02-05:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "deepseek/deepseek-r1-distill-llama-70b:free": {
+    "name": "deepseek/deepseek-r1-distill-llama-70b:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "google/gemini-2.0-flash-exp:free": {
+    "name": "google/gemini-2.0-flash-exp:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "qwen/qwen-2.5-72b-instruct:free": {
+    "name": "qwen/qwen-2.5-72b-instruct:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "mistralai/mistral-nemo:free": {
+    "name": "mistralai/mistral-nemo:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "llama-3.1-70b-versatile": {
+    "name": "llama-3.1-70b-versatile",
+    "provider": "groq",
+    "available": true,
+    "retryAfter": 0
+  },
+  "llama-3.1-8b-instant": {
+    "name": "llama-3.1-8b-instant",
+    "provider": "groq",
     "available": true,
     "retryAfter": 0,
-    "remainingRequests": 999,
-    "remainingTokens": 10259
+    "remainingRequests": 14400,
+    "remainingTokens": 6000
+  },
+  "google/gemini-2.0-flash-001:free": {
+    "name": "google/gemini-2.0-flash-001:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "deepseek/deepseek-r1:free": {
+    "name": "deepseek/deepseek-r1:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
   }
 }

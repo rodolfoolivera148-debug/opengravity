@@ -26,7 +26,8 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor iniciado en http://localhost:${PORT}`);
-    console.log(`📰 Agregador de feeds listo para usar`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor iniciado en puerto: ${PORT}`);
+    console.log(`📡 Accesible en red local: http://0.0.0.0:${PORT}`);
+    console.log(`📱 Para Android: Usa la IP de tu PC (ej: 192.168.1.15:${PORT})`);
 });

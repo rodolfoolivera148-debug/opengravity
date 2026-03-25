@@ -1,65 +1,72 @@
+// src/agent/mcpClient.ts
 import path from "path";
 // @ts-ignore
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // @ts-ignore
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+// @ts-ignore
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { dbFirestore } from "../config/firebase.js";
 
-// Usamos el cliente MCP oficial
-let mcpClient: Client | null = null;
-let mcpTools: any[] = [];
+interface McpServerConfig {
+    name: string;
+    type: "stdio" | "sse";
+    command?: string;
+    args?: string[];
+    url?: string;
+    env?: Record<string, string>;
+}
 
-/**
- * Resuelve referencias $ref en un schema JSON usando los $defs disponibles.
- * Esto es necesario porque Groq y otros LLMs no soportan $ref/$defs en sus herramientas.
- */
+const SERVERS: McpServerConfig[] = [
+    {
+        name: "firebase",
+        type: "stdio",
+        command: process.execPath,
+        args: [path.join(process.cwd(), "node_modules", "firebase-tools", "lib", "bin", "firebase.js"), "mcp"],
+        env: { CI: "1", FIREBASE_FRAMEWORK_TOOLS: "true" }
+    },
+    {
+        name: "colab_local",
+        type: "stdio",
+        command: "uvx",
+        // Quitamos cualquier flag que pueda causar ruido y forzamos logs a stderr
+        args: ["--quiet", "git+https://github.com/googlecolab/colab-mcp"],
+        env: { 
+            PYTHONUNBUFFERED: "1",
+            FAST_MCP_LOG_LEVEL: "ERROR" // Silenciamos el logo de FastMCP
+        }
+    }
+];
+
+let unifiedTools: any[] = [];
+const toolToClientMap = new Map<string, Client>();
+const clients: Client[] = [];
+
 function resolveRefs(schema: any, defs: Record<string, any> = {}): any {
     if (!schema || typeof schema !== 'object') return schema;
-
-    // Si es un array, resolver cada elemento
-    if (Array.isArray(schema)) {
-        return schema.map(item => resolveRefs(item, defs));
-    }
-
-    // Si tiene una referencia $ref
+    if (Array.isArray(schema)) return schema.map(item => resolveRefs(item, defs));
     if (schema['$ref']) {
         const refPath = schema['$ref'];
-        // extraer el nombre del $def (ej: "#/$defs/DocumentMask" -> "DocumentMask")
         const defName = refPath.split('/').pop();
-        if (defName && defs[defName]) {
-            // resolver recursivamente el $def referenciado (puede tener sus propios $ref)
-            return resolveRefs(defs[defName], defs);
-        }
-        // Si no encontramos el $def, devolver un schema genérico de string para evitar errores de validación
+        if (defName && defs[defName]) return resolveRefs(defs[defName], defs);
         return { type: 'string', description: `(Parameter: ${defName})` };
     }
-
-    // Iterar sobre las propiedades del objeto y resolver referencias en cada una
     const resolved: any = {};
     for (const key of Object.keys(schema)) {
-        // Omitir $defs y $schema ya que no son necesarios para el LLM
         if (key === '$defs' || key === '$schema') continue;
         resolved[key] = resolveRefs(schema[key], defs);
     }
     return resolved;
 }
 
-/**
- * Sanitiza el inputSchema de una herramienta MCP para que sea compatible con la API de Groq/Gemini.
- * Aplana las referencias $ref y elimina características no soportadas.
- */
 function sanitizeToolSchema(inputSchema: any): { type: string; properties: any; required: string[] } {
     if (!inputSchema) return { type: 'object', properties: {}, required: [] };
-
     const defs = inputSchema['$defs'] || {};
     const properties = inputSchema.properties || {};
-    const required = inputSchema.required || [];
-
-    // Resolver las referencias en cada propiedad
     const sanitizedProperties: any = {};
     for (const [propName, propSchema] of Object.entries(properties)) {
         try {
             const resolved = resolveRefs(propSchema as any, defs);
-            // Simplificar y mantener solo los campos esenciales
             sanitizedProperties[propName] = {
                 type: resolved.type || 'string',
                 description: (resolved.description || "").substring(0, 1024),
@@ -67,93 +74,83 @@ function sanitizeToolSchema(inputSchema: any): { type: string; properties: any; 
                 ...(resolved.properties ? { properties: resolved.properties } : {}),
                 ...(resolved.items ? { items: resolved.items } : {}),
             };
-        } catch {
-            sanitizedProperties[propName] = { type: 'string' };
-        }
+        } catch { sanitizedProperties[propName] = { type: 'string' }; }
     }
+    return { type: 'object', properties: sanitizedProperties, required: inputSchema.required || [] };
+}
 
-    return {
-        type: 'object',
-        properties: sanitizedProperties,
-        required: required,
-    };
+async function getRemoteColabUrl(): Promise<string | null> {
+    try {
+        const doc = await dbFirestore.collection("config").doc("mcp_remote").get();
+        return doc.exists ? (doc.data()?.url || null) : null;
+    } catch (e) { return null; }
 }
 
 export async function initMcpClient() {
-    console.log("[MCP] Iniciando cliente para firebase-tools...");
+    console.log(`[MCP] Iniciando ecosistema de herramientas...`);
+    unifiedTools = [];
+    toolToClientMap.clear();
 
-    const firebaseBin = path.join(process.cwd(), "node_modules", "firebase-tools", "lib", "bin", "firebase.js");
-    const transport = new StdioClientTransport({
-        command: process.execPath,
-        args: [firebaseBin, "mcp"],
-    });
-
-    mcpClient = new Client({
-        name: "opengravity-agent",
-        version: "1.0.0",
-    }, {
-        capabilities: {}
-    });
-
-    try {
-        await mcpClient.connect(transport);
-        console.log("[MCP] Conectado exitosamente al servidor MCP de Firebase.");
-
-        // Timeout de 60s para listar herramientas (margen máximo de seguridad)
-        const listToolsPromise = mcpClient.listTools();
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout al listar herramientas MCP")), 60000)
-        );
-
-        const toolsResponse = await Promise.race([listToolsPromise, timeoutPromise]) as any;
-        
-        const localMcpTools = toolsResponse.tools.map((tool: any) => ({
-            type: "function",
-            function: {
-                name: tool.name,
-                description: (tool.description || "").substring(0, 1024), 
-                parameters: sanitizeToolSchema(tool.inputSchema),
-            }
-        }));
-
-        const toolsCount = localMcpTools.length;
-        mcpTools = localMcpTools; // Assign to the global mcpTools
-        console.log(`[MCP] Cargadas ${toolsCount} herramientas de Firebase.`);
-    } catch (error: any) {
-        // Lógica de Reintento para MCP
-        if (!process.env.MCP_RETRIED) {
-            console.warn(`[MCP] Reintentando carga de herramientas... (${error.message})`);
-            process.env.MCP_RETRIED = "true";
-            return initMcpClient(); // Recursivo una sola vez
-        }
-        console.error(`[MCP] No se pudieron cargar herramientas de Firebase: ${error.message}`);
-        mcpClient = null;
+    const remoteUrl = await getRemoteColabUrl();
+    if (remoteUrl) {
+        console.log(`[MCP] Detectada Science Lab remota en: ${remoteUrl}`);
+        SERVERS.push({ name: "science_lab", type: "sse", url: remoteUrl });
     }
+
+    const TIMEOUT_MS = 240000; // 4 minutos de margen total
+    
+    const loadServer = async (config: McpServerConfig) => {
+        try {
+            console.log(`[MCP] Cargando: ${config.name}...`);
+            let transport;
+            if (config.type === "stdio") {
+                transport = new StdioClientTransport({
+                    command: config.command!,
+                    args: config.args!,
+                    env: { ...process.env, ...config.env }
+                } as any);
+            } else {
+                transport = new SSEClientTransport(new URL(config.url!));
+            }
+
+            const client = new Client({ name: "opengravity-agent", version: "1.0.0" }, { capabilities: {} });
+            await client.connect(transport, { timeout: TIMEOUT_MS });
+            
+            const toolsResponse = await client.listTools(undefined, { timeout: TIMEOUT_MS }) as any;
+            if (toolsResponse.tools && Array.isArray(toolsResponse.tools)) {
+                for (const tool of toolsResponse.tools) {
+                    unifiedTools.push({
+                        type: "function",
+                        function: {
+                            name: tool.name,
+                            description: `[${config.name}] ${tool.description || ""}`.substring(0, 1024),
+                            parameters: sanitizeToolSchema(tool.inputSchema),
+                        }
+                    });
+                    toolToClientMap.set(tool.name, client);
+                }
+                clients.push(client);
+                console.log(`[MCP] ✅ ${config.name} listo. (${toolsResponse.tools.length} herramientas)`);
+            }
+        } catch (error: any) {
+            console.error(`[MCP] ❌ ${config.name}: ${error.message}`);
+        }
+    };
+
+    await Promise.allSettled(SERVERS.map(s => loadServer(s)));
+    console.log(`[MCP] Total herramientas disponibles: ${unifiedTools.length}`);
 }
 
-export function getMcpTools() {
-    return mcpTools;
-}
+export function getMcpTools() { return unifiedTools; }
 
 export async function executeMcpTool(name: string, args: Record<string, any>): Promise<string> {
-    if (!mcpClient) {
-        throw new Error("[MCP] El cliente no está conectado.");
-    }
-
+    const client = toolToClientMap.get(name);
+    if (!client) throw new Error(`[MCP] Herramienta no encontrada: ${name}`);
     try {
-        console.log(`[MCP] Ejecutando: ${name} con args:`, args);
-        const result = await mcpClient.callTool({
-            name,
-            arguments: args
-        });
-
+        const result = await client.callTool({ name, arguments: args });
         const contentArr = result.content as any[];
-        if (contentArr && contentArr.length > 0) {
-            return contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
-        }
-        return "Herramienta ejecutada sin contenido de retorno.";
+        return contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
     } catch (error: any) {
-        console.error(`[MCP] Error ejecutando ${name}:`, error);
-        return `Error en la herramienta externa: ${error.message || String(error)}`;
+        return `Error en herramienta: ${error.message}`;
     }
 }
