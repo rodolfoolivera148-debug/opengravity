@@ -6,3 +6,12 @@ dist/
 memory.db
 *.db
 service-account.json
+
+# Test files
+*_test.ts
+dump_messages.ts
+test_firestore.ts
+prueba*.txt
+*.m4a
+superpowers/
+tmp_*.ts
