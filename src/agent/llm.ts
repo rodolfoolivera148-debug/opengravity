@@ -3,21 +3,17 @@ import { env } from "../config/env.js";
 import { modelTracker } from "./modelTracker.js";
 
 const models = [
-    // 1. Titulares Inteligentes (Groq es ultra-rápido)
+    // 1. Groq - Alta velocidad
     { name: "llama-3.3-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
-    
-    // 2. Groq Fallbacks (Sucesores de los modelos discontinuados)
-    { name: "llama-3.1-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
+    { name: "llama-3.2-11b-vision-preview", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
     { name: "llama-3.1-8b-instant", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
 
-    // 3. OpenRouter Pesos Pesados (Gratuitos de Alta Capacidad)
-    { name: "google/gemini-2.0-flash-001:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    // 2. OpenRouter - Free Tier Robustos (Verificados marzo 2026)
+    { name: "google/gemini-2.0-flash-lite-preview-02-05:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
     { name: "meta-llama/llama-3.3-70b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "qwen/qwen-2.5-72b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "deepseek/deepseek-r1:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    
-    // 4. Fallback de emergencia
-    { name: "mistralai/mistral-nemo:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
+    { name: "deepseek/deepseek-chat:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "mistralai/pixtral-12b:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "openrouter/auto", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
 ];
 
 export function getModelCount() { return models.length; }

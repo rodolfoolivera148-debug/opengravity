@@ -119,15 +119,18 @@ export async function initMcpClient() {
             const toolsResponse = await client.listTools(undefined, { timeout: TIMEOUT_MS }) as any;
             if (toolsResponse.tools && Array.isArray(toolsResponse.tools)) {
                 for (const tool of toolsResponse.tools) {
+                    // Prefijamos el nombre para evitar colisiones con herramientas locales
+                    const prefixedName = `mcp_${config.name}_${tool.name}`;
+                    
                     unifiedTools.push({
                         type: "function",
                         function: {
-                            name: tool.name,
+                            name: prefixedName,
                             description: `[${config.name}] ${tool.description || ""}`.substring(0, 1024),
                             parameters: sanitizeToolSchema(tool.inputSchema),
                         }
                     });
-                    toolToClientMap.set(tool.name, client);
+                    toolToClientMap.set(prefixedName, client);
                 }
                 clients.push(client);
                 console.log(`[MCP] ✅ ${config.name} listo. (${toolsResponse.tools.length} herramientas)`);
@@ -145,12 +148,17 @@ export function getMcpTools() { return unifiedTools; }
 
 export async function executeMcpTool(name: string, args: Record<string, any>): Promise<string> {
     const client = toolToClientMap.get(name);
-    if (!client) throw new Error(`[MCP] Herramienta no encontrada: ${name}`);
+    if (!client) throw new Error(`[MCP] Herramienta no encontrada o prefijo inválido: ${name}`);
+    
+    // Extraemos el nombre original (quitando el prefijo mcp_servidor_)
+    const nameParts = name.split("_");
+    const originalName = nameParts.slice(2).join("_");
+
     try {
-        const result = await client.callTool({ name, arguments: args });
+        const result = await client.callTool({ name: originalName, arguments: args });
         const contentArr = result.content as any[];
         return contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
     } catch (error: any) {
-        return `Error en herramienta: ${error.message}`;
+        return `Error en herramienta MCP (${name}): ${error.message}`;
     }
 }

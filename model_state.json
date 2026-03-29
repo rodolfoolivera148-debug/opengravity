@@ -2,10 +2,10 @@
   "llama-3.3-70b-versatile": {
     "name": "llama-3.3-70b-versatile",
     "provider": "groq",
-    "available": false,
+    "available": true,
     "retryAfter": 1774418620709,
-    "remainingRequests": 999,
-    "remainingTokens": 11960
+    "remainingRequests": 998,
+    "remainingTokens": 10241
   },
   "meta-llama/llama-3.3-70b-instruct:free": {
     "name": "meta-llama/llama-3.3-70b-instruct:free",
@@ -94,10 +94,10 @@
   "llama-3.1-8b-instant": {
     "name": "llama-3.1-8b-instant",
     "provider": "groq",
-    "available": true,
-    "retryAfter": 0,
-    "remainingRequests": 14400,
-    "remainingTokens": 6000
+    "available": false,
+    "retryAfter": 1774456910724,
+    "remainingRequests": 14399,
+    "remainingTokens": 91
   },
   "google/gemini-2.0-flash-001:free": {
     "name": "google/gemini-2.0-flash-001:free",

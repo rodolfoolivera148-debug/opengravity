@@ -1,7 +1,6 @@
 // src/index.ts
 import { env } from "./config/env.js";
 import { bot } from "./bot/telegram.js";
-import { onExit } from "signal-exit";
 
 async function main() {
     console.log("Iniciando OpenGravity v2.0...");
@@ -19,11 +18,16 @@ async function main() {
     console.log("Conexión estabilizada. Aguardando a que instancias previas cierren (15s)...");
     await new Promise(r => setTimeout(r, 15000));
 
-    // 4. Asegurar detención limpia
-    onExit(() => {
-        console.log("Deteniendo bot de forma segura...");
-        void bot.stop().catch(() => {});
-    });
+    // 4. Asegurar detención limpia (debe ser asíncrono para esperar el cierre de red)
+    const gracefulShutdown = async () => {
+        console.log("Cerrando sesión de Telegram (evitando 409)...");
+        try {
+            await bot.stop();
+        } catch (e) {}
+        process.exit(0);
+    };
+    process.once("SIGINT", gracefulShutdown);
+    process.once("SIGTERM", gracefulShutdown);
 
     bot.catch((err: any) => {
         const errMsg = err.description || err.message || "";
@@ -41,6 +45,7 @@ async function main() {
     while (!started && attempts < 5) {
         try {
             await bot.start({
+                drop_pending_updates: true,
                 onStart: (botInfo) => {
                     console.log(`🚀 BOT ONLINE: @${botInfo.username}`);
                     console.log(`🛡️ Seguridad activa. Solo usuarios permitidos.`);

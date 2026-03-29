@@ -16,23 +16,29 @@ const pendingConfirmations = new Map<string, (approved: boolean) => void>();
 export async function requestConfirmation(userId: number, toolName: string, args: any): Promise<boolean> {
     const confirmationId = `${userId}_${Date.now()}`;
     const keyboard = new InlineKeyboard()
-        .text("✅ Aprobar", `confirm_${confirmationId}_yes`)
-        .text("❌ Rechazar", `confirm_${confirmationId}_no`);
+        .text("✅ Aprobar", `confirm:yes:${confirmationId}`)
+        .text("❌ Rechazar", `confirm:no:${confirmationId}`);
 
     const summary = JSON.stringify(args, null, 2).substring(0, 500);
     const message = `⚠️ *PETICIÓN DE ACCIÓN SENSIBLE*\n\n🛠 *Herramienta:* \`${toolName}\`\n📋 *Argumentos:* \n\`\`\`json\n${summary}\n\`\`\`\n\n¿Deseas ejecutar esta acción?`;
 
+    console.log(`[Telegram Debug] Enviando teclado de confirmación para ${toolName} (ID: ${confirmationId})`);
     await bot.api.sendMessage(userId, message, {
         parse_mode: "Markdown",
         reply_markup: keyboard
     });
 
     return new Promise((resolve) => {
-        pendingConfirmations.set(confirmationId, resolve);
+        pendingConfirmations.set(confirmationId, (val) => {
+            console.log(`[Telegram Debug] Resolver llamado para ID: ${confirmationId} con valor: ${val}`);
+            resolve(val);
+        });
+        
         // Timeout de seguridad por si el usuario no responde en 5 min
         setTimeout(() => {
             if (pendingConfirmations.has(confirmationId)) {
                 pendingConfirmations.delete(confirmationId);
+                console.log(`[Telegram Debug] Timeout de 5min alcanzado para ID: ${confirmationId}`);
                 resolve(false);
             }
         }, 300000);
@@ -42,16 +48,29 @@ export async function requestConfirmation(userId: number, toolName: string, args
 // Manejar clics en los botones de confirmación
 bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data || "";
-    if (data.startsWith("confirm_")) {
-        const [_, id, choice] = data.split("_");
+    if (data.startsWith("confirm:")) {
+        const parts = data.split(":");
+        const choice = parts[1];
+        const id = parts.slice(2).join(":"); // Reconstruye el ID completo
         const resolver = pendingConfirmations.get(id);
+        
+        console.log(`[Telegram Debug] Clic detectado. ID: ${id}, Choice: ${choice}, Resolver Existe: ${!!resolver}`);
         
         if (resolver) {
             resolver(choice === "yes");
             pendingConfirmations.delete(id);
-            await ctx.editMessageText(choice === "yes" ? "✅ Acción aprobada y en ejecución..." : "❌ Acción rechazada.");
+            try {
+                await ctx.editMessageText(choice === "yes" ? "✅ Acción aprobada y en ejecución..." : "❌ Acción rechazada.");
+            } catch (e: any) {
+                console.warn(`[Telegram] Error editando texto: ${e.message}`);
+            }
         } else {
-            await ctx.answerCallbackQuery("Error: Esta petición ha expirado.");
+            console.log(`[Telegram Debug] Resolver no encontrado para ID: ${id}. Mostrando expirado.`);
+            try {
+                await ctx.answerCallbackQuery("Error: Esta petición ha expirado.");
+            } catch (e: any) {
+                console.warn(`[Telegram] Error respondiendo callback: ${e.message}`);
+            }
         }
     }
 });
@@ -86,12 +105,19 @@ bot.use(async (ctx, next) => {
 bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id;
     await ctx.replyWithChatAction("typing");
-    try {
-        const response = await runAgentLoop(userId, ctx.message.text);
-        await sendRobustMessage(ctx, response);
-    } catch (error: any) {
-        await ctx.reply("❌ Error al procesar tu mensaje.");
-    }
+    
+    // No usamos 'await' directo aquí para no bloquear el bucle de eventos de Telegram.
+    // Al dejarlo asíncrono, el bot puede recibir clics de botones (confirmaciones)
+    // mientras el Agente está pensando.
+    (async () => {
+        try {
+            const response = await runAgentLoop(userId, ctx.message.text);
+            await sendRobustMessage(ctx, response);
+        } catch (error: any) {
+            console.error("[Telegram Error] Falló el loop del agente:", error.message);
+            await ctx.reply("❌ Error al procesar tu mensaje.");
+        }
+    })();
 });
 
 bot.command("start", async (ctx) => {
