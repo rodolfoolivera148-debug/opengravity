@@ -1,5 +1,7 @@
 // src/memory/memoryManager.ts
 import { dbFirestore } from "../config/firebase.js";
+import { FieldValue } from "firebase-admin/firestore";
+import { env } from "../config/env.js";
 import { saveMessage as saveLocal, getMessages as getLocal, MessageRow } from "./db.js";
 
 const COLLECTION_NAME = 'messages';
@@ -56,6 +58,64 @@ export async function clearMessages(userId: number) {
         await batch.commit();
     } catch (error) {
         console.error("[Memory] Error limpiando Firestore.");
+    }
+}
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(env.OPENROUTER_API_KEY || ""); // Usando la misma key
+const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+
+/**
+ * Persistencia de Trazas de Aprendizaje (LeJEPA / Self-Improving)
+ */
+export async function saveTrace(userId: number, traceData: {
+    category: string;
+    user_message: string;
+    thought_process: string[];
+    tool_calls: any[];
+    results: string[];
+    model_index: number;
+    success: boolean;
+}) {
+    try {
+        // Generar embedding para búsqueda semántica (LeJEPA)
+        let vector = null;
+        try {
+            const result = await embeddingModel.embedContent(traceData.user_message);
+            vector = result.embedding.values;
+        } catch (e) {}
+
+        await dbFirestore.collection('traces').add({
+            user_id: userId,
+            ...traceData,
+            embedding: vector ? FieldValue.vector(vector) : null,
+            timestamp: new Date(),
+        });
+    } catch (error) {
+        console.warn("[Memory] Error al guardar traza semántica.");
+    }
+}
+
+/**
+ * Búsqueda de Memoria Semántica (LeJEPA inspired)
+ */
+export async function getSemanticContext(userId: number, query: string, category: string) {
+    try {
+        // Primero intentamos por categoría (fallback rápido)
+        const snapshot = await dbFirestore.collection('traces')
+            .where('user_id', '==', userId)
+            .where('category', '==', category)
+            .where('success', '==', true)
+            .limit(2)
+            .get();
+
+        return snapshot.docs.map(doc => {
+            const d = doc.data();
+            return `Ejemplo de éxito: User: "${d.user_message}" -> Pensó: "${d.thought_process[0]}" -> Resultado: "${d.results[0]}"`;
+        }).join('\n');
+    } catch (e) {
+        return "";
     }
 }
 

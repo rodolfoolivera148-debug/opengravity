@@ -2,16 +2,16 @@
   "llama-3.3-70b-versatile": {
     "name": "llama-3.3-70b-versatile",
     "provider": "groq",
-    "available": true,
-    "retryAfter": 1774744611121,
-    "remainingRequests": 997,
-    "remainingTokens": 9097
+    "available": false,
+    "retryAfter": 1774841438912,
+    "remainingRequests": 992,
+    "remainingTokens": 12000
   },
   "meta-llama/llama-3.3-70b-instruct:free": {
     "name": "meta-llama/llama-3.3-70b-instruct:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1774743991322
+    "retryAfter": 1774828399853
   },
   "google/gemma-3-27b-it:free": {
     "name": "google/gemma-3-27b-it:free",
@@ -94,10 +94,10 @@
   "llama-3.1-8b-instant": {
     "name": "llama-3.1-8b-instant",
     "provider": "groq",
-    "available": true,
-    "retryAfter": 1774456910724,
+    "available": false,
+    "retryAfter": 1774840101946,
     "remainingRequests": 14399,
-    "remainingTokens": 4555
+    "remainingTokens": 398
   },
   "google/gemini-2.0-flash-001:free": {
     "name": "google/gemini-2.0-flash-001:free",
@@ -107,6 +107,24 @@
   },
   "deepseek/deepseek-r1:free": {
     "name": "deepseek/deepseek-r1:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "llama-3.2-11b-vision-preview": {
+    "name": "llama-3.2-11b-vision-preview",
+    "provider": "groq",
+    "available": true,
+    "retryAfter": 0
+  },
+  "mistralai/pixtral-12b:free": {
+    "name": "mistralai/pixtral-12b:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "openrouter/auto": {
+    "name": "openrouter/auto",
     "provider": "openrouter",
     "available": true,
     "retryAfter": 0

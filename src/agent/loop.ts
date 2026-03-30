@@ -1,8 +1,10 @@
 // src/agent/loop.ts
 import { getLLMResponse, getModelCount, getInitialModelIndex } from "./llm.js";
 import { executeTool, getTools } from "./tools.js";
-import { saveMessage, getMessages, getGlobalState, setGlobalState } from "../memory/memoryManager.js";
+import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext } from "../memory/memoryManager.js";
 import { requestConfirmation } from "../bot/telegram.js";
+import { PROMPTS } from "../config/prompts.js";
+import { runFailureAudit } from "./auditor.js";
 
 const MAX_TOOL_ITERATIONS = 12;
 
@@ -13,36 +15,38 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     let toolIterations = 0;
     let modelIndex = getInitialModelIndex();
 
-    // --- STEP 1: ROUTING (Estrategia 1: Agente Enrutador) ---
-    // Usamos el primer intento para decidir que "scope" de apps necesitamos
+    // --- ESTRUCTURA DE AUTOAPRENDIZAJE (Trace Data) ---
+    const traceData = {
+        category: "CORE",
+        user_message: userMessage,
+        thought_process: [] as string[],
+        tool_calls: [] as any[],
+        results: [] as string[],
+        model_index: modelIndex,
+        success: false
+    };
+
+    // --- STEP 1: ROUTING ---
     const allTools = getTools();
-    const routerPrompt = `Recibiste este mensaje: "${userMessage}".
-    Dime a qué dominio pertenece para activar las herramientas correctas. Responde SOLO con una de estas categorías:
-    - FIREBASE: Para bases de datos en la nube.
-    - COLAB: Para ciencia de datos y Python remoto.
-    - WORKSPACE: Para Gmail, Drive y oficina.
-    - DEV: Para leer/escribir archivos locales o usar la terminal.
-    - CORE: Para preguntas generales sin herramientas.
-    `;
-    
     let category = "CORE";
     try {
-        const routerResponse = await getLLMResponse([{ role: "system", content: routerPrompt }], 0); // Groq es rápido para esto
+        const routerResponse = await getLLMResponse([{ role: "system", content: PROMPTS.ROUTER_PROMPT(userMessage) }], 0);
         category = (routerResponse.choices[0].message.content || "CORE").trim().toUpperCase();
+        traceData.category = category;
         console.log(`[Router] Mensaje clasificado como: ${category}`);
     } catch (e) {
-        console.warn("[Router] Fallo en clasificación, usando todas las herramientas.");
-        category = "ALL";
+        console.warn("[Router] Fallo en clasificación.");
     }
 
+    // --- STEP 1.1: RECUPERACIÓN SEMÁNTICA (LeJEPA inspired) ---
+    const learningContext = await getSemanticContext(userId, userMessage, category);
+    if (learningContext) console.log(`[Autoaprendizaje] Recuperando ${learningContext.split('\n').length} ejemplos de éxito.`);
+
     // Filtrar herramientas (Estrategia 1: Híbrida)
-    // Siempre incluimos las herramientas locales básicas para evitar errores 400 de LLM
     const localToolNames = ['execute_terminal_command', 'read_file', 'write_file', 'list_directory', 'get_current_time', 'execute_google_workspace_action'];
     const activeTools = allTools.filter(t => {
         const name = t.function.name;
-        // 1. Siempre incluir locales
         if (localToolNames.includes(name)) return true;
-        // 2. Solo incluir MCP si el router lo activó (evitando ruido/límites de tokens)
         if (category === "ALL") return true;
         if (category === "FIREBASE" && name.startsWith("mcp_firebase_")) return true;
         if (category === "COLAB" && name.startsWith("mcp_colab_")) return true;
@@ -50,16 +54,8 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         return false;
     });
 
-    const SYSTEM_PROMPT = `Eres OpenGravity v2.0 (Router Edition), un agente experto en automatización local operando en un entorno Windows.
-    Contexto Actual (Memoria de Estado): ${JSON.stringify(currentState)}
-    
-    Capacidades activas para este mensaje: ${category}.
-    
-    INSTRUCCIONES CRÍTICAS:
-    1. Si necesitas realizar acciones sensibles (terminal/archivos), llama a la herramienta adecuada. El usuario aprobará manualmente cada acción, así que no dudes en usarlas por motivos de seguridad.
-    2. Si en el historial ves una respuesta de herramienta (role: "tool") indicando éxito (ej. "Archivo guardado exitosamente"), CONFIRMA al usuario que la tarea está terminada. No te disculpes ni digas que "no tienes permiso", porque el éxito de la herramienta prueba que SÍ lo tienes.
-    3. Responde siempre en español de forma directa y profesional.
-    `;
+    const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState) + 
+        (learningContext ? `\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "");
 
     // 1. Cargamos el historial una sola vez al inicio del bucle
     const historyLimit = modelIndex === 0 ? 10 : 20;
@@ -101,17 +97,17 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
 
             if (message.content) {
                 console.log(`[Modelo Pensamiento]: ${message.content.substring(0, 300)}...`);
+                traceData.thought_process.push(message.content);
             }
 
             if (message.tool_calls && message.tool_calls.length > 0) {
                 console.log(`[Modelo ToolCalls]: ${message.tool_calls.map((tc: any) => tc.function.name).join(", ")}`);
-                
-                // Guardar en DB para persistencia
+                traceData.tool_calls.push(...message.tool_calls);
+
                 await saveMessage(userId, 'assistant', JSON.stringify({ 
                     content: message.content || null, 
                     tool_calls: message.tool_calls 
                 }));
-                // Actualizar historial local del giro para velocidad
                 turnHistory.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls });
 
                 for (const toolCall of message.tool_calls) {
@@ -123,30 +119,30 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                         // --- STEP 2: SECURITY VALIDATION ---
                         const sensitiveTools = ['execute_terminal_command', 'write_file', 'firestore-delete'];
                         if (sensitiveTools.some(st => toolName.includes(st))) {
-                            console.log(`[Seguridad] Pidiendo confirmación para: ${toolName}`);
                             const confirmed = await requestConfirmation(userId, toolName, toolArgs);
                             if (!confirmed) {
                                 const result = "Acción rechazada por el usuario (Seguridad).";
                                 await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolName, result }));
                                 turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
+                                traceData.results.push(result);
                                 continue;
                             }
                         }
 
                         // --- STEP 3: EXECUTION ---
                         let result = await executeTool(toolName, toolArgs);
-                        
                         if (!result.includes("Error") && category === "DEV") {
                             await setGlobalState(userId, "last_action", `Ejecutada ${toolName} con éxito`);
                         }
 
                         await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolName, result }));
                         turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
+                        traceData.results.push(result);
                     } catch (toolError: any) {
-                        console.error(`[Tool Error] Error procesando ${toolCall.function.name}:`, toolError.message);
                         const result = `Error interno: ${toolError.message}`;
                         await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolCall.function.name, result }));
                         turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
+                        traceData.results.push(result);
                     }
                 }
                 continue;
@@ -154,6 +150,8 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
 
             if (message.content) {
                 await saveMessage(userId, 'assistant', message.content);
+                traceData.success = true;
+                await saveTrace(userId, traceData); // GUARDAR TRAZA FINAL PARA APRENDIZAJE
                 return message.content;
             }
             return "El modelo no generó una respuesta.";
@@ -162,9 +160,12 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
             console.error(`[AgentLoop Error]: ${error.message}`);
             if (modelIndex < getModelCount() - 1) {
                 modelIndex++;
-                toolIterations--; // Reintentar con nuevo modelo
+                traceData.model_index = modelIndex;
+                toolIterations--;
                 continue;
             }
+            await saveTrace(userId, { ...traceData, success: false }); // Guardar fallo
+            await runFailureAudit(userId); // DISPARAR AUDITORÍA DE APRENDIZAJE TRAS ERROR CRÍTICO
             return `Ocurrió un error crítico: ${error.message}`;
         }
     }
