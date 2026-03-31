@@ -3,13 +3,26 @@ import { getFirestore } from "firebase-admin/firestore";
 import { env } from "./env.js";
 
 // Inicializar Firebase Admin SDK usando sub-módulos ESM
-// Nota: Si GOOGLE_APPLICATION_CREDENTIALS está definido en el .env, 
-// no es necesario pasar nada a initializeApp().
 let adminApp;
+
 if (getApps().length === 0) {
-    adminApp = initializeApp({
+    const options: any = {
         projectId: env.FIREBASE_PROJECT_ID,
-    });
+    };
+
+    // Si pasamos el JSON entero por variable de entorno (Render/GCP)
+    if (env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        try {
+            const cert = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            const { cert: adminCert } = await import("firebase-admin/app");
+            options.credential = adminCert(cert);
+            console.log("[Firebase] Usando credenciales de variable de entorno.");
+        } catch (e) {
+            console.error("[Firebase] Error parseando FIREBASE_SERVICE_ACCOUNT_JSON:", e);
+        }
+    }
+
+    adminApp = initializeApp(options);
     console.log(`[Firebase] SDK inicializado para el proyecto: ${env.FIREBASE_PROJECT_ID}`);
 } else {
     adminApp = getApp();

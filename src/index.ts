@@ -1,9 +1,14 @@
-// src/index.ts
 import { env } from "./config/env.js";
 import { bot } from "./bot/telegram.js";
+import express from "express";
 
 async function main() {
     console.log("Iniciando OpenGravity v2.0...");
+    
+    // Express para Webhook/Cloud Run Salud
+    const app = express();
+    app.get("/", (req, res) => res.send("OpenGravity Bot is Online ✅"));
+    app.listen(env.PORT, () => console.log(`[Cloud] Port ${env.PORT} listening for health checks.`));
 
     // 1. Validar conexión a Cloud Firestore
     await import("./config/firebase.js");
