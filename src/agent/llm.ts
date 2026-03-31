@@ -3,17 +3,18 @@ import { env } from "../config/env.js";
 import { modelTracker } from "./modelTracker.js";
 
 const models = [
-    // 1. Groq - Alta velocidad
+    // 1. OpenRouter - Free Tier (Gemini 2.0 Flash Lite - Masivo Context Window y Quotas)
+    { name: "google/gemini-2.0-flash-lite-001", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "google/gemini-2.0-flash-001", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+
+    // 2. Groq - Alta velocidad (Verificados Marzo 2026)
     { name: "llama-3.3-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
-    { name: "llama-3.2-11b-vision-preview", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
+    { name: "llama-3.1-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
     { name: "llama-3.1-8b-instant", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
 
-    // 2. OpenRouter - Free Tier Robustos (Verificados marzo 2026)
-    { name: "google/gemini-2.0-flash-lite-preview-02-05:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    // 3. Otros fallbacks
     { name: "meta-llama/llama-3.3-70b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "deepseek/deepseek-chat:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "mistralai/pixtral-12b:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "openrouter/auto", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
+    { name: "deepseek/deepseek-chat", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
 ];
 
 export function getModelCount() { return models.length; }

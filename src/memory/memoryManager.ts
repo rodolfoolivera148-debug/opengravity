@@ -141,3 +141,45 @@ export async function getGlobalState(userId: number): Promise<any> {
         return {};
     }
 }
+
+/**
+ * Recupera las sugerencias críticas generadas por el Auditor tras fallos pasados.
+ */
+export async function getPromptOptimizations(userId: number): Promise<string> {
+    try {
+        const doc = await dbFirestore.collection('prompt_optimizations').doc(userId.toString()).get();
+        if (doc.exists) {
+            const data = doc.data();
+            return data?.last_suggestion ? `⚠️ REGLA CRÍTICA (Basada en fallos previos): ${data.last_suggestion}` : "";
+        }
+        return "";
+    } catch (e) {
+        return "";
+    }
+}
+
+/**
+ * Obtiene un resumen del estado de evolución (LeJEPA/Auditor)
+ */
+export async function getEvolutionSummary(userId: number) {
+    try {
+        const doc = await dbFirestore.collection('prompt_optimizations').doc(userId.toString()).get();
+        
+        // Contar trazas totales
+        const traceSnapshot = await dbFirestore.collection('traces').where('user_id', '==', userId).get();
+        const traceCount = traceSnapshot.size;
+        
+        // Contar éxitos
+        const successSnapshot = await dbFirestore.collection('traces').where('user_id', '==', userId).where('success', '==', true).get();
+        const successCount = successSnapshot.size;
+        
+        return {
+            total_traces: traceCount,
+            success_rate: traceCount > 0 ? ((successCount / traceCount) * 100).toFixed(1) : "0",
+            last_rule: doc.exists ? doc.data()?.last_suggestion : "Ninguna aún"
+        };
+    } catch (e) {
+        console.error("[Memory] Error en getEvolutionSummary:", e);
+        return null;
+    }
+}

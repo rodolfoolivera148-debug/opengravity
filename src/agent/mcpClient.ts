@@ -7,6 +7,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // @ts-ignore
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { dbFirestore } from "../config/firebase.js";
+import { env } from "../config/env.js";
 
 interface McpServerConfig {
     name: string;
@@ -21,9 +22,16 @@ const SERVERS: McpServerConfig[] = [
     {
         name: "firebase",
         type: "stdio",
-        command: process.execPath,
-        args: [path.join(process.cwd(), "node_modules", "firebase-tools", "lib", "bin", "firebase.js"), "mcp"],
-        env: { CI: "1", FIREBASE_FRAMEWORK_TOOLS: "true" }
+        command: "npx",
+        args: [
+            "firebase", 
+            "mcp"
+        ],
+        env: { 
+            CI: "1", 
+            FIREBASE_FRAMEWORK_TOOLS: "true",
+            GCP_PROJECT: env.FIREBASE_PROJECT_ID
+        }
     },
     {
         name: "colab_local",

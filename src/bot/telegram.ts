@@ -123,3 +123,22 @@ bot.on("message:text", async (ctx) => {
 bot.command("start", async (ctx) => {
     await ctx.reply("¡Hola! Soy OpenGravity. He activado el sistema de validación estricta y ruteo inteligente.");
 });
+
+bot.command("status", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { getEvolutionSummary } = await import("../memory/memoryManager.js");
+    const summary = await getEvolutionSummary(userId);
+
+    if (!summary) {
+        return await ctx.reply("❌ No se pudo recuperar el estado de evolución.");
+    }
+
+    const message = `📈 *ESTADO DE EVOLUCIÓN (OpenGravity v2.0)*\n\n` +
+        `🧠 *Experiencia acumulada:* ${summary.total_traces} trazas\n` +
+        `✅ *Tasa de éxito:* ${summary.success_rate}%\n\n` +
+        `⚠️ *REGLA ACTIVA (Auditor):*\n_\`${summary.last_rule}\`_`;
+
+    await ctx.reply(message, { parse_mode: "Markdown" });
+});

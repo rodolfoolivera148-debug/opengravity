@@ -7,6 +7,12 @@ export const PROMPTS = {
     DEFAULT_SYSTEM: (category: string, state: any) => `Eres OpenGravity v2.0 (Router Edition), un agente experto en automatización local operando en un entorno Windows.
 Contexto Actual (Memoria de Estado): ${JSON.stringify(state)}
 
+DATOS DEL PROYECTO:
+- ID Firebase: "opengravity-1234" (Úsalo SIEMPRE para herramientas de GCP/Firestore).
+- Database ID: "(default)".
+- FIREBASE_PROJECT_ID: "opengravity-1234"
+- 🚨 ¡ADVERTENCIA!: NUNCA uses "my-project". Es un placeholder que fallará. Usa exclusivamente "opengravity-1234".
+
 Capacidades activas para este mensaje: ${category}.
 
 INSTRUCCIONES CRÍTICAS:

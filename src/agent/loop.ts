@@ -1,7 +1,7 @@
 // src/agent/loop.ts
 import { getLLMResponse, getModelCount, getInitialModelIndex } from "./llm.js";
 import { executeTool, getTools } from "./tools.js";
-import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext } from "../memory/memoryManager.js";
+import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext, getPromptOptimizations } from "../memory/memoryManager.js";
 import { requestConfirmation } from "../bot/telegram.js";
 import { PROMPTS } from "../config/prompts.js";
 import { runFailureAudit } from "./auditor.js";
@@ -38,9 +38,12 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         console.warn("[Router] Fallo en clasificación.");
     }
 
-    // --- STEP 1.1: RECUPERACIÓN SEMÁNTICA (LeJEPA inspired) ---
     const learningContext = await getSemanticContext(userId, userMessage, category);
     if (learningContext) console.log(`[Autoaprendizaje] Recuperando ${learningContext.split('\n').length} ejemplos de éxito.`);
+
+    // --- STEP 1.2: RECUPERACIÓN DE REGLAS CRÍTICAS (Auditor) ---
+    const promptOptimizations = await getPromptOptimizations(userId);
+    if (promptOptimizations) console.log(`[Autoaprendizaje] Aplicando optimización de prompt activa.`);
 
     // Filtrar herramientas (Estrategia 1: Híbrida)
     const localToolNames = ['execute_terminal_command', 'read_file', 'write_file', 'list_directory', 'get_current_time', 'execute_google_workspace_action'];
@@ -55,10 +58,11 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     });
 
     const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState) + 
-        (learningContext ? `\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "");
+        (learningContext ? `\n\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "") +
+        (promptOptimizations ? `\n\n${promptOptimizations}` : "");
 
-    // 1. Cargamos el historial una sola vez al inicio del bucle
-    const historyLimit = modelIndex === 0 ? 10 : 20;
+    // 1. Cargamos el historial de forma más compacta para evitar TPM Limits (Groq)
+    const historyLimit = modelIndex === 0 ? 5 : 12;
     const historyData = await getMessages(userId, historyLimit);
     let turnHistory = historyData.map(msg => {
         if (msg.role === 'assistant') {
@@ -92,6 +96,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         console.log(`[AgentLoop] Iter ${toolIterations} | Contexto: ${messages.length} mensajes (Giro: ${turnHistory.length})`);
 
         try {
+            // Filtrar herramientas activas por categoría para reducir tamaño de prompt (Estrategia 2: Context-Aware Loading)
             const response = await getLLMResponse(messages, modelIndex, activeTools);
             const message = response.choices[0].message;
 
