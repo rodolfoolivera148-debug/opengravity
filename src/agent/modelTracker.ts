@@ -95,6 +95,11 @@ class ModelTracker {
             }
             state.retryAfter = now + waitMs;
             console.warn(`[ModelTracker] ⚠️ Modelo ${modelName} marcado como NO DISPONIBLE hasta ${new Date(state.retryAfter).toLocaleTimeString()}`);
+        } else if (statusCode === 401 || statusCode === 403) {
+            // Error de autenticación, la API Key no sirve o fue revocada. Bloqueo prolongado.
+            state.available = false;
+            state.retryAfter = now + (1000 * 60 * 60 * 24); // 24 horas
+            console.warn(`[ModelTracker] ⛔ Modelo ${modelName} inhabilitado por fallo de Autenticación (${statusCode}).`);
         } else if (statusCode >= 500) {
             // Error de servidor o de proveedor, darle un respiro de 30s
             state.available = false;
