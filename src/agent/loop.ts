@@ -1,7 +1,7 @@
 // src/agent/loop.ts
 import { getLLMResponse, getModelCount, getInitialModelIndex } from "./llm.js";
 import { executeTool, getTools } from "./tools.js";
-import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext, getPromptOptimizations } from "../memory/memoryManager.js";
+import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext, getPromptOptimizations, getUserProfile } from "../memory/memoryManager.js";
 import { requestConfirmation } from "../bot/telegram.js";
 import { PROMPTS } from "../config/prompts.js";
 import { runFailureAudit } from "./auditor.js";
@@ -10,6 +10,7 @@ const MAX_TOOL_ITERATIONS = 12;
 
 export async function runAgentLoop(userId: number, userMessage: string): Promise<string> {
     const currentState = await getGlobalState(userId);
+    const userProfile = await getUserProfile(userId);
     await saveMessage(userId, 'user', userMessage);
 
     let toolIterations = 0;
@@ -58,6 +59,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     });
 
     const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState) + 
+        (userProfile.length > 0 ? `\n\nLO QUE SÉ SOBRE RODOLFO (Memoria a Largo Plazo):\n- ${userProfile.join('\n- ')}` : "") +
         (learningContext ? `\n\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "") +
         (promptOptimizations ? `\n\n${promptOptimizations}` : "");
 
@@ -135,7 +137,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                         }
 
                         // --- STEP 3: EXECUTION ---
-                        let result = await executeTool(toolName, toolArgs);
+                        let result = await executeTool(toolName, toolArgs, userId);
                         if (!result.includes("Error") && category === "DEV") {
                             await setGlobalState(userId, "last_action", `Ejecutada ${toolName} con éxito`);
                         }

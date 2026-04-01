@@ -183,3 +183,31 @@ export async function getEvolutionSummary(userId: number) {
         return null;
     }
 }
+
+/**
+ * GESTIÓN DE PERFIL DE USUARIO (Conocimiento a Largo Plazo)
+ * Guarda hechos específicos sobre Rodolfo para personalizar la experiencia.
+ */
+export async function getUserProfile(userId: number): Promise<string[]> {
+    try {
+        const doc = await dbFirestore.collection('user_metadata').doc(userId.toString()).get();
+        if (doc.exists) {
+            return doc.data()?.facts || [];
+        }
+        return [];
+    } catch (e) {
+        console.warn("[Memory] No se pudo leer el perfil de usuario.");
+        return [];
+    }
+}
+
+export async function addFactToProfile(userId: number, fact: string) {
+    try {
+        await dbFirestore.collection('user_metadata').doc(userId.toString()).set({
+            facts: FieldValue.arrayUnion(fact),
+            lastUpdate: new Date()
+        }, { merge: true });
+    } catch (e) {
+        console.error("[Memory] Error al guardar hecho en el perfil.");
+    }
+}

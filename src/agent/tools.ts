@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { executeMcpTool, getMcpTools } from "./mcpClient.js";
+import { addFactToProfile } from "../memory/memoryManager.js";
 import { execSync } from "child_process";
 import path from "path";
 import fs from "fs";
@@ -102,20 +103,26 @@ export const tools = [
             }
         }
     },
-    {
-        type: "function",
-        function: {
-            name: "list_directory",
-            description: "Lista los archivos y carpetas dentro de un directorio.",
-            parameters: {
-                type: "object",
-                properties: {
-                    dirpath: {
-                        type: "string",
-                        description: "La ruta de la carpeta a listar."
                     }
                 },
                 required: ["dirpath"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "save_user_fact",
+            description: "Guarda un hecho o preferencia importante sobre Rodolfo en su perfil permanente. Úsalo cuando Rodolfo mencione algo que debas recordar a largo plazo (proyectos, gustos, ubicación, etc.).",
+            parameters: {
+                type: "object",
+                properties: {
+                    fact: {
+                        type: "string",
+                        description: "El hecho corto y descriptivo sobre Rodolfo (ej. 'Rodolfo prefiere programar en Rust', 'Rodolfo vive en Buenos Aires')."
+                    }
+                },
+                required: ["fact"]
             }
         }
     }
@@ -133,7 +140,7 @@ export function getLocalTools() {
     return [...tools];
 }
 
-export async function executeTool(name: string, args: Record<string, any>): Promise<string> {
+export async function executeTool(name: string, args: Record<string, any>, userId: number): Promise<string> {
     const isLocal = tools.some(t => t.function.name === name);
     
     if (isLocal) {
@@ -210,6 +217,14 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
                     }).join('\n');
                 } catch (error: any) {
                     return `Error al listar directorio: ${error.message}`;
+                }
+            }
+            case "save_user_fact": {
+                try {
+                    await addFactToProfile(userId, args.fact);
+                    return `Hecho guardado exitosamente en el perfil de Rodolfo.`;
+                } catch (error: any) {
+                    return `Error al guardar hecho: ${error.message}`;
                 }
             }
             default:
