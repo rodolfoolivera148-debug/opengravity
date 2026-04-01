@@ -63,6 +63,18 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
 
     // --- STEP 1.3: CONSTRUIR CAPACIDADES DINÁMICAS ---
     let capabilities = getMcpStatus();
+    
+    // Inyectar Superpoderes (Metodología)
+    try {
+        const superPath = path.resolve(process.cwd(), "superpowers/skills/using-superpowers/SKILL.md");
+        if (fs.existsSync(superPath)) {
+            const superContent = fs.readFileSync(superPath, "utf-8");
+            capabilities += `\n\nMETODOLOGÍA DE SUPERPODERES (Cómo debes operar):\n${superContent}`;
+        }
+    } catch (e) {
+        console.warn("[Loop] No se pudo leer Superpowers SKILL.md");
+    }
+
     if (category === "WORKSPACE" || userMessage.toLowerCase().includes("workspace") || userMessage.toLowerCase().includes("gmail")) {
         try {
             const skillPath = path.resolve(process.cwd(), "SKILL.md");
