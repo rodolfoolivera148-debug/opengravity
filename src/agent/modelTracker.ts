@@ -11,7 +11,10 @@ interface ModelState {
     remainingTokens?: number;
 }
 
-const STATE_FILE = path.join(process.cwd(), 'model_state.json');
+const META_DIR = path.join(process.cwd(), '.opengravity');
+if (!fs.existsSync(META_DIR)) fs.mkdirSync(META_DIR, { recursive: true });
+
+const STATE_FILE = path.join(META_DIR, 'model_state.json');
 
 class ModelTracker {
     private states: Record<string, ModelState> = {};
