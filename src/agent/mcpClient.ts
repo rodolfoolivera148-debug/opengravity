@@ -24,6 +24,7 @@ const SERVERS: McpServerConfig[] = [
         type: "stdio",
         command: "npx",
         args: [
+            "--no-install",
             "firebase", 
             "mcp"
         ],
@@ -148,7 +149,9 @@ export async function initMcpClient() {
         }
     };
 
-    await Promise.allSettled(SERVERS.map(s => loadServer(s)));
+    for (const config of SERVERS) {
+        await loadServer(config);
+    }
     console.log(`[MCP] Total herramientas disponibles: ${unifiedTools.length}`);
 }
 
