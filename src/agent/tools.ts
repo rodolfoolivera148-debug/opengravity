@@ -103,6 +103,17 @@ export const tools = [
             }
         }
     },
+    {
+        type: "function",
+        function: {
+            name: "list_directory",
+            description: "Lista los archivos y carpetas dentro de un directorio.",
+            parameters: {
+                type: "object",
+                properties: {
+                    dirpath: {
+                        type: "string",
+                        description: "La ruta de la carpeta a listar."
                     }
                 },
                 required: ["dirpath"]
