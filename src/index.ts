@@ -1,6 +1,6 @@
 import { env } from "./config/env.js";
 import { bot } from "./bot/telegram.js";
-import express from "express";
+import express, { Request, Response } from "express";
 import { webhookCallback } from "grammy";
 
 async function main() {
@@ -10,7 +10,9 @@ async function main() {
     const app = express();
     app.use(express.json());
 
-    app.get("/", (req, res) => res.send("OpenGravity Bot is Online ✅"));
+    app.get("/", (req: Request, res: Response) => {
+        res.send("OpenGravity Bot is Online ✅");
+    });
 
     // MODO WEBHOOK (Para Nube 100% Gratis - Cloud Run/Render)
     if (env.WEBHOOK_URL) {
