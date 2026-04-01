@@ -154,6 +154,14 @@ export async function initMcpClient() {
 
 export function getMcpTools() { return unifiedTools; }
 
+export function getMcpStatus(): string {
+    if (unifiedTools.length === 0) return "No hay herramientas MCP conectadas actualmente.";
+    return SERVERS.map(s => {
+        const count = unifiedTools.filter(t => t.function.name.startsWith(`mcp_${s.name}_`)).length;
+        return `- MCP [${s.name}]: ${count} herramientas activas.`;
+    }).join("\n");
+}
+
 export async function executeMcpTool(name: string, args: Record<string, any>): Promise<string> {
     const client = toolToClientMap.get(name);
     if (!client) throw new Error(`[MCP] Herramienta no encontrada o prefijo inválido: ${name}`);

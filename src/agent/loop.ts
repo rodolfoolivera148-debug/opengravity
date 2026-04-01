@@ -1,6 +1,9 @@
 // src/agent/loop.ts
 import { getLLMResponse, getModelCount, getInitialModelIndex } from "./llm.js";
 import { executeTool, getTools } from "./tools.js";
+import { getMcpStatus } from "./mcpClient.js";
+import fs from "fs";
+import path from "path";
 import { saveMessage, getMessages, getGlobalState, setGlobalState, saveTrace, getSemanticContext, getPromptOptimizations, getUserProfile } from "../memory/memoryManager.js";
 import { requestConfirmation } from "../bot/telegram.js";
 import { PROMPTS } from "../config/prompts.js";
@@ -58,7 +61,21 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         return false;
     });
 
-    const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState) + 
+    // --- STEP 1.3: CONSTRUIR CAPACIDADES DINÁMICAS ---
+    let capabilities = getMcpStatus();
+    if (category === "WORKSPACE" || userMessage.toLowerCase().includes("workspace") || userMessage.toLowerCase().includes("gmail")) {
+        try {
+            const skillPath = path.resolve(process.cwd(), "SKILL.md");
+            if (fs.existsSync(skillPath)) {
+                const skillContent = fs.readFileSync(skillPath, "utf-8");
+                capabilities += `\n\nGUÍA DE USO PARA GOOGLE WORKSPACE (gogcli):\n${skillContent}`;
+            }
+        } catch (e) {
+            console.warn("[Loop] No se pudo leer SKILL.md");
+        }
+    }
+
+    const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState, capabilities) + 
         (userProfile.length > 0 ? `\n\nLO QUE SÉ SOBRE RODOLFO (Memoria a Largo Plazo):\n- ${userProfile.join('\n- ')}` : "") +
         (learningContext ? `\n\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "") +
         (promptOptimizations ? `\n\n${promptOptimizations}` : "");
