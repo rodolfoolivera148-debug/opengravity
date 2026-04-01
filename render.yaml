@@ -18,7 +18,8 @@ services:
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
       - key: WEBHOOK_URL
-        sync: false
+        value: "https://opengravity-xky8.onrender.com"
+
       - key: OPENROUTER_MODEL
         value: "openrouter/free"
       - key: DB_PATH
