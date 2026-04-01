@@ -4,8 +4,8 @@
     "provider": "groq",
     "available": true,
     "retryAfter": 1774841438912,
-    "remainingRequests": 999,
-    "remainingTokens": 12000
+    "remainingRequests": 997,
+    "remainingTokens": 7451
   },
   "meta-llama/llama-3.3-70b-instruct:free": {
     "name": "meta-llama/llama-3.3-70b-instruct:free",
@@ -143,6 +143,12 @@
   },
   "google/gemini-2.0-flash-lite-001": {
     "name": "google/gemini-2.0-flash-lite-001",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "google/gemini-2.0-flash-001": {
+    "name": "google/gemini-2.0-flash-001",
     "provider": "openrouter",
     "available": true,
     "retryAfter": 0
