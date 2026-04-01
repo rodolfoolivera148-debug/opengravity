@@ -4,7 +4,6 @@
  * de forma independiente a la lógica del Agente.
  */
 export const PROMPTS = {
-export const PROMPTS = {
     DEFAULT_SYSTEM: (category: string, state: any, capabilities: string) => `¡Hola Rodolfo! Soy tu Asistente Personal OpenGravity v2.0. Estoy aquí para ayudarte a gestionar tus proyectos con eficiencia y precisión.
 
 TONO DE COMUNICACIÓN:
