@@ -1,0 +1,62 @@
+﻿Usage: gog auth add <email> [flags]
+Build: v0.12.0 (c18c58c)
+
+Authorize and store a refresh token
+
+Arguments:
+  <email>    Email
+
+Flags:
+  -h, --help                    Show context-sensitive help.
+      --color="auto"            Color output: auto|always|never
+  -a, --account=STRING          Account email for API commands
+                                (gmail/calendar/chat/classroom/drive/docs/slides/contacts/tasks/people/sheets/forms/appscript)
+      --client=""               OAuth client name (selects stored credentials +
+                                token bucket)
+      --access-token=STRING     Use provided access token directly (bypasses
+                                stored refresh tokens; token expires in ~1h)
+                                ($GOG_ACCESS_TOKEN)
+      --enable-commands=""      Comma-separated list of enabled top-level
+                                commands (restricts CLI)
+  -j, --json                    Output JSON to stdout (best for scripting)
+  -p, --plain                   Output stable, parseable text to stdout (TSV;
+                                no colors)
+      --results-only            In JSON mode, emit only the primary result
+                                (drops envelope fields like nextPageToken)
+      --select=STRING           In JSON mode, select comma-separated fields
+                                (best-effort; supports dot paths). Desire path:
+                                use --fields for most commands.
+  -n, --dry-run                 Do not make changes; print intended actions and
+                                exit successfully
+  -y, --force                   Skip confirmations for destructive commands
+      --no-input                Never prompt; fail instead (useful for CI)
+  -v, --verbose                 Enable verbose logging
+      --version                 Print version and exit
+
+      --manual                  Browserless auth flow (paste redirect URL)
+      --remote                  Remote/server-friendly manual flow (print URL,
+                                then exchange code)
+      --step=INT                Remote auth step: 1=print URL, 2=exchange code
+      --listen-addr=STRING      Address to listen on for OAuth callback (for
+                                example 0.0.0.0 or 0.0.0.0:8080)
+      --redirect-host=STRING    Hostname for OAuth callback in browser flows;
+                                builds https://{host}/oauth2/callback
+      --redirect-uri=STRING     Override OAuth redirect URI for
+                                manual/remote flows (for example
+                                https://host.example/oauth2/callback)
+      --auth-url=STRING         Redirect URL from browser (manual flow; required
+                                for --remote --step 2)
+      --timeout=DURATION        Authorization timeout (manual flows default to
+                                5m)
+      --force-consent           Force consent screen to obtain a refresh token
+      --services="user"         Services to authorize:
+                                user|all or comma-separated
+                                gmail,calendar,chat,classroom,drive,docs,slides,contacts,tasks,sheets,people,forms,appscript
+                                (Keep uses service account: gog auth
+                                service-account set)
+      --readonly                Use read-only scopes where available (still
+                                includes OIDC identity scopes)
+      --drive-scope="full"      Drive scope mode: full|readonly|file
+      --gmail-scope="full"      Gmail scope mode: full|readonly
+      --extra-scopes=STRING     Comma-separated list of additional OAuth scope
+                                URIs to request (appended after service scopes)
