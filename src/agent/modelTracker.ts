@@ -119,11 +119,11 @@ class ModelTracker {
     /**
      * Retorna el primer modelo de la lista que esté disponible.
      */
-    getBestAvailableModelIndex(models: any[]): number {
+    getBestAvailableModelIndex(models: { name: string }[]): number {
         const now = Date.now();
         for (let i = 0; i < models.length; i++) {
             const m = models[i];
-            const state = this.states[m.model];
+            const state = this.states[m.name];
             
             if (!state) return i; 
             if (state.available) return i;
