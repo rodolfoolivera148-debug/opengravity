@@ -81,13 +81,13 @@ bot.on("callback_query:data", async (ctx) => {
 async function sendRobustMessage(ctx: any, content: string) {
     const MAX_LENGTH = 3800;
     if (content.length <= MAX_LENGTH) {
-        return await ctx.reply(content, { parse_mode: "Markdown" }).catch(() => ctx.reply(content));
+        return await ctx.reply(content);
     }
     const preview = content.substring(0, 1000) + "\n\n... (Mensaje truncado. Ver archivo completo) ...";
     await ctx.reply(preview);
     try {
         const fileContent = Buffer.from(content, 'utf-8');
-        await ctx.replyWithDocument(new InputFile(fileContent, "respuesta_completa.md"), {
+        await ctx.replyWithDocument(new InputFile(fileContent, "respuesta_completa.txt"), {
             caption: "📄 Respuesta completa generada por OpenGravity"
         });
     } catch (e) {
