@@ -17,6 +17,8 @@ const models = [
     { name: "deepseek/deepseek-chat", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" }
 ];
 
+export { models };
+
 export function getModelCount() { return models.length; }
 
 export function getInitialModelIndex() {

@@ -142,3 +142,36 @@ bot.command("status", async (ctx) => {
 
     await ctx.reply(message, { parse_mode: "Markdown" });
 });
+
+bot.command("reset", async (ctx) => {
+    const { modelTracker } = await import("../agent/modelTracker.js");
+    modelTracker.resetState();
+    await ctx.reply("✅ Estados de modelos reseteados. Los modelos bloqueados por errores de autenticación ahora están disponibles.");
+});
+
+bot.command("api", async (ctx) => {
+    const { getLLMResponse, models } = await import("../agent/llm.js");
+    
+    await ctx.reply("🔄 Verificando APIs...");
+    
+    const results: string[] = [];
+    
+    try {
+        await getLLMResponse([{ role: "user", content: "responde solo con 'OK'" }], 0);
+        results.push("✅ Groq: OK");
+    } catch (e: any) {
+        results.push(`❌ Groq: ${e.message.substring(0, 100)}`);
+    }
+    
+    try {
+        const openrouterIdx = models.findIndex((m: any) => m.provider === "openrouter");
+        if (openrouterIdx >= 0) {
+            await getLLMResponse([{ role: "user", content: "responde solo con 'OK'" }], openrouterIdx);
+            results.push("✅ OpenRouter: OK");
+        }
+    } catch (e: any) {
+        results.push(`❌ OpenRouter: ${e.message.substring(0, 100)}`);
+    }
+    
+    await ctx.reply(results.join("\n"));
+});

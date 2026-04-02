@@ -134,6 +134,15 @@ class ModelTracker {
         }
         return 0; 
     }
+
+    /**
+     * Resetea todos los estados de modelos (para comando /reset)
+     */
+    resetState() {
+        this.states = {};
+        this.saveState();
+        console.log("[ModelTracker] Estados reseteados manualmente.");
+    }
 }
 
 export const modelTracker = new ModelTracker();
