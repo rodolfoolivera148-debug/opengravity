@@ -111,8 +111,8 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
             try {
                 const parsed = JSON.parse(msg.content);
                 let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
-                const limit = modelIndex === 0 ? 1200 : 3000;
-                if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "...";
+                const limit = 10000;
+                if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "... [truncado]";
                 return { role: 'tool', tool_call_id: parsed.tool_call_id, content: contentStr };
             } catch (e) { }
         }
