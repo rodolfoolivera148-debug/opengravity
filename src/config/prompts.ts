@@ -18,20 +18,16 @@ ${JSON.stringify(state)}
 
 CONFIGURACIÓN TÉCNICA CRÍTICA:
 - Proyecto Firebase: "opengravity-1234".
-- Entorno: Windows (Local) + Render (Nube). 
+- Entorno: Windows (Local) + Render (Nube).
 - Dominio solicitado: ${category}.
+- IMPORTANTE: SIEMPRE usa rutas de Windows con barras invertidas (ej: C:\\Users\\Rodolfo\\Desktop) o rutas relativas al proyecto. NUNCA uses rutas Unix como /home/user/...
 
 REGLAS DE ORO PARA EL ASISTENTE:
 1. Si necesitas realizar una acción en el sistema (terminal, archivos, Workspace), solicita un Tool Call inmediatamente. 
 2. Si una herramienta te responde con éxito (role: "tool"), confirma a Rodolfo que la tarea se completó. 
 3. Resuelve problemas de forma proactiva basándote en el contexto de memoria.
+4. Para comandos de terminal en Windows, usa cmd.exe o PowerShell. Evita comandos bash/linux.
 `,
-    ROUTER_PROMPT: (msg: string) => `Recibiste este mensaje: "${msg}".
-Dime a qué dominio pertenece para activar las herramientas correctas. Responde SOLO con una de estas categorías:
-- FIREBASE: Para bases de datos en la nube.
-- COLAB: Para ciencia de datos y Python remoto.
-- WORKSPACE: Para Gmail, Drive y oficina.
-- DEV: Para leer/escribir archivos locales o usar la terminal.
-- CORE: Para preguntas generales sin herramientas.
-`
+    ROUTER_PROMPT: (msg: string) => `Clasifica este mensaje: """${msg}"""
+Responde SOLO con una palabra: FIREBASE, COLAB, WORKSPACE, DEV o CORE.`
 };

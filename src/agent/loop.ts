@@ -35,11 +35,14 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     let category = "CORE";
     try {
         const routerResponse = await getLLMResponse([{ role: "system", content: PROMPTS.ROUTER_PROMPT(userMessage) }], 0);
-        category = (routerResponse.choices[0].message.content || "CORE").trim().toUpperCase();
+        let rawCategory = routerResponse.choices[0].message.content || "CORE";
+        rawCategory = rawCategory.trim().toUpperCase().replace(/[^A-Z]/g, '');
+        const validCategories = ['FIREBASE', 'COLAB', 'WORKSPACE', 'DEV', 'CORE'];
+        category = validCategories.includes(rawCategory) ? rawCategory : "CORE";
         traceData.category = category;
         console.log(`[Router] Mensaje clasificado como: ${category}`);
     } catch (e) {
-        console.warn("[Router] Fallo en clasificación.");
+        console.warn("[Router] Fallo en clasificación:", e);
     }
 
     const learningContext = await getSemanticContext(userId, userMessage, category);
