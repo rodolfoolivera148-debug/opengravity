@@ -3,7 +3,7 @@
     "name": "google/gemini-2.0-flash-lite-001",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1775231117855
+    "retryAfter": 1775232471108
   },
   "google/gemini-2.0-flash-001": {
     "name": "google/gemini-2.0-flash-001",
@@ -15,9 +15,9 @@
     "name": "llama-3.3-70b-versatile",
     "provider": "groq",
     "available": false,
-    "retryAfter": 1775145897126,
+    "retryAfter": 1775147956266,
     "remainingRequests": 999,
-    "remainingTokens": 12000
+    "remainingTokens": 11580
   },
   "llama-3.1-70b-versatile": {
     "name": "llama-3.1-70b-versatile",
@@ -31,7 +31,7 @@
     "available": true,
     "retryAfter": 1775060506945,
     "remainingRequests": 14399,
-    "remainingTokens": 3468
+    "remainingTokens": 3612
   },
   "meta-llama/llama-3.3-70b-instruct:free": {
     "name": "meta-llama/llama-3.3-70b-instruct:free",
