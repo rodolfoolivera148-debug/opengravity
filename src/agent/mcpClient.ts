@@ -25,11 +25,11 @@ const SERVERS: McpServerConfig[] = [
         command: "npx",
         args: [
             "--no-install",
-            "firebase", 
+            "firebase",
             "mcp"
         ],
-        env: { 
-            CI: "1", 
+        env: {
+            CI: "1",
             FIREBASE_FRAMEWORK_TOOLS: "true",
             GCP_PROJECT: env.FIREBASE_PROJECT_ID
         }
@@ -43,6 +43,16 @@ const SERVERS: McpServerConfig[] = [
         env: { 
             PYTHONUNBUFFERED: "1",
             FAST_MCP_LOG_LEVEL: "ERROR" // Silenciamos el logo de FastMCP
+        }
+    },
+    {
+        name: "trendradar",
+        type: "stdio",
+        command: "uvx",
+        args: ["--quiet", "--from", "git+https://github.com/sansan0/TrendRadar", "trendradar-mcp"],
+        env: { 
+            PYTHONUNBUFFERED: "1",
+            // Puedes añadir aquí variables de entorno de TrendRadar si las necesitas
         }
     }
 ];
@@ -107,7 +117,7 @@ export async function initMcpClient() {
     }
 
     const TIMEOUT_MS = 240000; // 4 minutos de margen total
-    
+
     const loadServer = async (config: McpServerConfig) => {
         try {
             console.log(`[MCP] Cargando: ${config.name}...`);
@@ -124,13 +134,13 @@ export async function initMcpClient() {
 
             const client = new Client({ name: "opengravity-agent", version: "1.0.0" }, { capabilities: {} });
             await client.connect(transport, { timeout: TIMEOUT_MS });
-            
+
             const toolsResponse = await client.listTools(undefined, { timeout: TIMEOUT_MS }) as any;
             if (toolsResponse.tools && Array.isArray(toolsResponse.tools)) {
                 for (const tool of toolsResponse.tools) {
                     // Prefijamos el nombre para evitar colisiones con herramientas locales
                     const prefixedName = `mcp_${config.name}_${tool.name}`;
-                    
+
                     unifiedTools.push({
                         type: "function",
                         function: {
@@ -168,7 +178,7 @@ export function getMcpStatus(): string {
 export async function executeMcpTool(name: string, args: Record<string, any>): Promise<string> {
     const client = toolToClientMap.get(name);
     if (!client) throw new Error(`[MCP] Herramienta no encontrada o prefijo inválido: ${name}`);
-    
+
     // Extraemos el nombre original (quitando el prefijo mcp_servidor_)
     const nameParts = name.split("_");
     const originalName = nameParts.slice(2).join("_");
