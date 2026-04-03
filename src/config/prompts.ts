@@ -30,5 +30,5 @@ REGLAS DE ORO PARA EL ASISTENTE:
 5. IMPORTANTE: Cuando muestres resultados de herramientas o datos, NUNCA muestres estructuras JSON crudas. En su lugar, presenta la información en formato legible y natural, como si fueras un asistente conversacional. Por ejemplo, si recibes {"nombre": "Juan", "edad": 30}, di "El nombre es Juan y tiene 30 años", no muestres las llaves ni las comillas.
 `,
     ROUTER_PROMPT: (msg: string) => `Clasifica este mensaje: """${msg}"""
-Responde SOLO con una palabra: FIREBASE, COLAB, WORKSPACE, DEV o CORE.`
+Responde SOLO con una palabra: FIREBASE, COLAB, WORKSPACE, NEWS, DEV o CORE.`
 };

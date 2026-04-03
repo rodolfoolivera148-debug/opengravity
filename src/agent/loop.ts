@@ -37,7 +37,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         const routerResponse = await getLLMResponse([{ role: "system", content: PROMPTS.ROUTER_PROMPT(userMessage) }], 0);
         let rawCategory = routerResponse.choices[0].message.content || "CORE";
         rawCategory = rawCategory.trim().toUpperCase().replace(/[^A-Z]/g, '');
-        const validCategories = ['FIREBASE', 'COLAB', 'WORKSPACE', 'DEV', 'CORE'];
+        const validCategories = ['FIREBASE', 'COLAB', 'WORKSPACE', 'NEWS', 'DEV', 'CORE'];
         category = validCategories.includes(rawCategory) ? rawCategory : "CORE";
         traceData.category = category;
         console.log(`[Router] Mensaje clasificado como: ${category}`);
@@ -61,6 +61,9 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         if (category === "FIREBASE" && name.startsWith("mcp_firebase_")) return true;
         if (category === "COLAB" && name.startsWith("mcp_colab_")) return true;
         if (category === "WORKSPACE" && name.startsWith("mcp_workspace_")) return true;
+        if (category === "NEWS" && name.startsWith("mcp_trendradar_")) return true;
+        const msgLow = userMessage.toLowerCase();
+        if (name.startsWith("mcp_trendradar_") && (msgLow.includes("rastre") || msgLow.includes("crawl") || msgLow.includes("trendradar") || msgLow.includes("notici"))) return true;
         return false;
     });
 
