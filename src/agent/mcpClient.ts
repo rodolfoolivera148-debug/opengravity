@@ -48,8 +48,8 @@ const SERVERS: McpServerConfig[] = [
     {
         name: "trendradar",
         type: "stdio",
-        command: "uvx",
-        args: ["--quiet", "--from", "git+https://github.com/sansan0/TrendRadar", "trendradar-mcp"],
+        command: "uv",
+        args: ["run", "--directory", "trendradar-repo", "python", "-m", "mcp_server.server"],
         env: { 
             PYTHONUNBUFFERED: "1",
             PYTHONUTF8: "1",
