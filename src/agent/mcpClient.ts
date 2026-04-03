@@ -52,6 +52,7 @@ const SERVERS: McpServerConfig[] = [
         args: ["--quiet", "--from", "git+https://github.com/sansan0/TrendRadar", "trendradar-mcp"],
         env: { 
             PYTHONUNBUFFERED: "1",
+            PYTHONUTF8: "1",
             // Puedes añadir aquí variables de entorno de TrendRadar si las necesitas
         }
     }
