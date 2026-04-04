@@ -63,7 +63,9 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         if (category === "WORKSPACE" && name.startsWith("mcp_workspace_")) return true;
         if (category === "NEWS" && name.startsWith("mcp_trendradar_")) return true;
         const msgLow = userMessage.toLowerCase();
-        if (name.startsWith("mcp_trendradar_") && (msgLow.includes("rastre") || msgLow.includes("crawl") || msgLow.includes("trendradar") || msgLow.includes("notici"))) return true;
+        // Ampliamos palabras clave para forzar inyección de herramientas de noticias
+        const newsKeywords = ["rastre", "crawl", "trendradar", "notici", " ai", " ia", "artificial", "tecnolog", "china", "shanghai", "beijing"];
+        if (name.startsWith("mcp_trendradar_") && newsKeywords.some(kw => msgLow.includes(kw))) return true;
         return false;
     });
 

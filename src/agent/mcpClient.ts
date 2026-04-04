@@ -8,6 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { dbFirestore } from "../config/firebase.js";
 import { env } from "../config/env.js";
+import { getLLMResponse, getInitialModelIndex } from "./llm.js";
 
 interface McpServerConfig {
     name: string;
@@ -184,11 +185,59 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
     const nameParts = name.split("_");
     const originalName = nameParts.slice(2).join("_");
 
+    // Interceptor de Traducción para TrendRadar
+    const isTrendRadar = name.startsWith("mcp_trendradar_");
+    if (isTrendRadar) {
+        args.limit = Math.min(args.limit || 5, 5); // Forzamos un límite manejable para traducción de alta calidad
+    }
+
     try {
-        const result = await client.callTool({ name: originalName, arguments: args });
+        const result = await client.callTool(
+            { name: originalName, arguments: args },
+            undefined, // resultSchema - use default
+            { timeout: 300000 } // 5 minutos de timeout para herramientas pesadas
+        );
+
         const contentArr = result.content as any[];
-        return contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
+        let finalResponse = contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
+
+        if (isTrendRadar && !finalResponse.includes("Error")) {
+            console.log(`[MCP] 🌐 Traduciendo resultados de ${name}...`);
+            finalResponse = await translateTrendRadarResult(finalResponse);
+        }
+
+        return finalResponse;
     } catch (error: any) {
         return `Error en herramienta MCP (${name}): ${error.message}`;
+    }
+}
+
+/**
+ * Helper dedicado para traducir los resultados de TrendRadar de forma aislada.
+ * Esto evita que el Agente principal "se salte" la traducción por saturación.
+ */
+async function translateTrendRadarResult(content: string): Promise<string> {
+    try {
+        const index = getInitialModelIndex();
+        const messages = [
+            { 
+                role: "system", 
+                content: `Eres un traductor experto de Chino a Español. Tu única tarea es traducir los TITULARES de noticias.
+REGLAS:
+1. Mantén la estructura original de los resultados (plataformas, listas, etc.).
+2. Traduce todos los titulares al español de forma natural y atractiva.
+3. Si hay términos en inglés (ej: AI, Tesla), mantenlos o tradúcelos según el contexto.
+4. Responde SOLO con el contenido traducido, sin preámbulos ni explicaciones.
+5. Si el contenido ya parece estar en español, devuélvelo tal cual.` 
+            },
+            { role: "user", content: content }
+        ];
+
+        // Usamos un modelo rápido pero capaz para esta tarea puntual
+        const translationModel = await getLLMResponse(messages, index);
+        return translationModel.choices[0].message.content || content;
+    } catch (e) {
+        console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);
+        return content; // Fallback al contenido original si la traducción falla
     }
 }
