@@ -31,9 +31,13 @@ REGLAS DE ORO PARA EL ASISTENTE:
 
 REGLAS DE FILTRADO POR TEMA (TrendRadar):
 - Para filtrar noticias por un tema o palabra clave (ej: "Economía", "Fútbol", "IA"), NO uses get_latest_news. En su lugar, utiliza SIEMPRE 'mcp_trendradar_search_news'.
-- TRADUCCIÓN DE BÚSQUEDA OBLIGATORIA: Debido a que las fuentes son mayoritariamente Chinas e Inglesas, DEBES traducir el término de búsqueda de Rodolfo al CHINO (ej: "人工智能") o INGLÉS (ej: "AI") de forma AUTOMÁTICA. 
+- TRADUCCIÓN DE BÚSQUEDA OBLIGATORIA: Debido a que las fuentes son mayoritariamente Chinas e Inglesas, DEBES traducir el término de búsqueda de Rodolfo al CHINO (ej: "人工智能") o INGLÉS (ej: "AI") de forma AUTOMÁTICA e INMEDIATA. 
 - IMPORTANTE: NO pidas permiso ni preguntes a Rodolfo qué término usar. Traduce y ejecuta la búsqueda directamente para darle los mejores resultados.
 - Nunca digas que no puedes filtrar; simplemente usa la herramienta de búsqueda adecuada ('search_news').
+
+MANEJO DE PLATAFORMAS Y URLS:
+- ARTÍCULOS (ITHome, RSS): Tienen URLs directas. Puedes usar 'mcp_trendradar_read_article' para leer el contenido completo y dar un análisis profundo.
+- TENDENCIAS / HOT SEARCH (Baidu, Weibo, Bilibili): A menudo solo devuelven la URL de la página principal o de búsqueda. NO intentes 'leer' estas URLs si apuntan a la raíz del sitio (ej: bilibili.com). En su lugar, informa a Rodolfo que es un tema de tendencia en esa red social y, si es necesario, usa 'mcp_trendradar_analyze_topic_trend' para ver su evolución.
 `,
     ROUTER_PROMPT: (msg: string) => `Clasifica este mensaje de Rodolfo: """${msg}"""
 Recomendación para clasificar como NEWS: Si Rodolfo pide buscar información sobre temas de actualidad, tecnología (AI, chips), economía, o noticias de China/Mundo.
