@@ -185,10 +185,16 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
     const nameParts = name.split("_");
     const originalName = nameParts.slice(2).join("_");
 
-    // Interceptor de Traducción para TrendRadar
+    // Interceptor de Parámetros y Calidad para TrendRadar
     const isTrendRadar = name.startsWith("mcp_trendradar_");
     if (isTrendRadar) {
-        args.limit = Math.min(args.limit || 5, 5); // Forzamos un límite manejable para traducción de alta calidad
+        // Solo inyectamos o limitamos el parámetro 'limit' en herramientas de búsqueda o listas
+        const isListTool = name.includes("search") || name.includes("latest") || name.includes("_topics") || name.includes("_date");
+        if (isListTool) {
+            args.limit = Math.min(args.limit || 5, 5); 
+            // Siempre incluimos la URL en las listas para que el agente pueda leerlas después
+            args.include_url = true; 
+        }
     }
 
     try {
@@ -203,7 +209,8 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
 
         if (isTrendRadar && !finalResponse.includes("Error")) {
             console.log(`[MCP] 🌐 Traduciendo resultados de ${name}...`);
-            finalResponse = await translateTrendRadarResult(finalResponse);
+            const isArticle = name.includes("read_article");
+            finalResponse = await translateTrendRadarResult(finalResponse, isArticle);
         }
 
         return finalResponse;
@@ -216,26 +223,37 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
  * Helper dedicado para traducir los resultados de TrendRadar de forma aislada.
  * Esto evita que el Agente principal "se salte" la traducción por saturación.
  */
-async function translateTrendRadarResult(content: string): Promise<string> {
+async function translateTrendRadarResult(content: string, isArticle: boolean = false): Promise<string> {
     try {
         const index = getInitialModelIndex();
-        const messages = [
-            { 
-                role: "system", 
-                content: `Eres un traductor experto de Chino a Español. Tu única tarea es traducir los TITULARES de noticias.
-REGLAS:
+        
+        let systemPrompt = `Eres un traductor experto de Chino a Español. Tu tarea es traducir los resultados de noticias.`;
+        
+        if (isArticle) {
+            systemPrompt += `\nREGLAS PARA ARTÍCULOS COMPLETOS:
+1. El contenido es un artículo en Markdown obtenido vía Jina Reader.
+2. Traduce el contenido completo al español manteniendo el formato Markdown (títulos, negritas, enlaces).
+3. Asegura que el tono sea profesional e informativo.
+4. Si el texto es muy extenso, prioriza la traducción de los párrafos principales y conclusiones.`;
+        } else {
+            systemPrompt += `\nREGLAS PARA TITULARES:
 1. Mantén la estructura original de los resultados (plataformas, listas, etc.).
 2. Traduce todos los titulares al español de forma natural y atractiva.
-3. Si hay términos en inglés (ej: AI, Tesla), mantenlos o tradúcelos según el contexto.
-4. Responde SOLO con el contenido traducido, sin preámbulos ni explicaciones.
-5. Si el contenido ya parece estar en español, devuélvelo tal cual.` 
-            },
+3. Si hay términos en inglés (ej: AI, Tesla), mantenlos o tradúcelos según el contexto.`;
+        }
+
+        systemPrompt += `\n\nREGLAS GENERALES:
+- Responde SOLO con el contenido traducido, sin preámbulos ni explicaciones.
+- Si el contenido ya parece estar en español, devuélvelo tal cual.`;
+
+        const messages = [
+            { role: "system", content: systemPrompt },
             { role: "user", content: content }
         ];
 
         // Usamos un modelo rápido pero capaz para esta tarea puntual
         const translationModel = await getLLMResponse(messages, index);
-        return translationModel.choices[0].message.content || content;
+        return translationModel.choices?.[0]?.message?.content || content;
     } catch (e) {
         console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);
         return content; // Fallback al contenido original si la traducción falla

@@ -31,7 +31,8 @@ REGLAS DE ORO PARA EL ASISTENTE:
 
 REGLAS DE FILTRADO POR TEMA (TrendRadar):
 - Para filtrar noticias por un tema o palabra clave (ej: "Economía", "Fútbol", "IA"), NO uses get_latest_news. En su lugar, utiliza SIEMPRE 'mcp_trendradar_search_news'.
-- TRADUCCIÓN DE BÚSQUEDA: Debido a que las fuentes son mayoritariamente Chinas e Inglesas, debes traducir el término de búsqueda de Rodolfo al CHINO (ej: "人工智能") o INGLÉS (ej: "AI") antes de pasarlo al parámetro 'query' de la herramienta. NO busques directamente en español.
+- TRADUCCIÓN DE BÚSQUEDA OBLIGATORIA: Debido a que las fuentes son mayoritariamente Chinas e Inglesas, DEBES traducir el término de búsqueda de Rodolfo al CHINO (ej: "人工智能") o INGLÉS (ej: "AI") de forma AUTOMÁTICA. 
+- IMPORTANTE: NO pidas permiso ni preguntes a Rodolfo qué término usar. Traduce y ejecuta la búsqueda directamente para darle los mejores resultados.
 - Nunca digas que no puedes filtrar; simplemente usa la herramienta de búsqueda adecuada ('search_news').
 `,
     ROUTER_PROMPT: (msg: string) => `Clasifica este mensaje de Rodolfo: """${msg}"""
