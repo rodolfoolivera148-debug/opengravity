@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from "firebase-admin/app";
+import { initializeApp, getApps, getApp, getCert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { env } from "./env.js";
 
@@ -14,8 +14,7 @@ if (getApps().length === 0) {
     if (env.FIREBASE_SERVICE_ACCOUNT_JSON) {
         try {
             const cert = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-            const { cert: adminCert } = await import("firebase-admin/app");
-            options.credential = adminCert(cert);
+            options.credential = getCert(cert);
             console.log("[Firebase] Usando credenciales de variable de entorno.");
         } catch (e) {
             console.error("[Firebase] Error parseando FIREBASE_SERVICE_ACCOUNT_JSON:", e);

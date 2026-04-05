@@ -252,8 +252,8 @@ async function translateTrendRadarResult(content: string, isArticle: boolean = f
         ];
 
         // Usamos un modelo rápido pero capaz para esta tarea puntual
-        const translationModel = await getLLMResponse(messages, index);
-        return translationModel.choices?.[0]?.message?.content || content;
+        const { data } = await getLLMResponse(messages, index);
+        return data.choices?.[0]?.message?.content || content;
     } catch (e) {
         console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);
         return content; // Fallback al contenido original si la traducción falla

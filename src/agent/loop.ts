@@ -184,7 +184,11 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                         traceData.results.push(result);
                     } catch (toolError: any) {
                         const result = `Error interno: ${toolError.message}`;
-                        await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolCall.function.name, result }));
+                        await saveMessage(userId, 'tool', JSON.stringify({ 
+                            tool_call_id: toolCall.id, 
+                            name: toolName, 
+                            result 
+                        }));
                         turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
                         traceData.results.push(result);
                     }

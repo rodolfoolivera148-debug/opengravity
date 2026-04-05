@@ -89,7 +89,7 @@ export async function saveTrace(userId: number, traceData: {
         await dbFirestore.collection('traces').add({
             user_id: userId,
             ...traceData,
-            embedding: vector ? FieldValue.vector(vector) : null,
+            embedding: vector,
             timestamp: new Date(),
         });
     } catch (error) {

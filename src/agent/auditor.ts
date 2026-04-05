@@ -19,8 +19,10 @@ export async function runFailureAudit(userId: number) {
 
         const allTraces = snapshot.docs.map((doc: QueryDocumentSnapshot) => {
             const d = doc.data();
-            return { user: d.user_message, thought: d.thought_process?.[0], results: d.results, success: d.success };
+            return { user: d.user_message, thought: d.thought_process?.[0], results: d.results, success: d.success, timestamp: d.timestamp?.toDate() };
         });
+
+        allTraces.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
 
         const failures = allTraces.filter(t => t.success === false).slice(0, 3);
         const successes = allTraces.filter(t => t.success === true).slice(0, 2);
