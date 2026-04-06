@@ -4,5 +4,11 @@
     "provider": "openrouter",
     "available": true,
     "retryAfter": 0
+  },
+  "qwen/qwen3.6-plus:free": {
+    "name": "qwen/qwen3.6-plus:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
   }
 }

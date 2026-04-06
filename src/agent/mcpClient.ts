@@ -23,11 +23,12 @@ const SERVERS: McpServerConfig[] = [
     {
         name: "firebase",
         type: "stdio",
-        command: "npx",
+        command: "node",
         args: [
-            "--no-install",
-            "firebase",
-            "mcp"
+            path.resolve(process.cwd(), "node_modules/firebase-tools/lib/bin/firebase.js"),
+            "mcp",
+            "--only",
+            "core,firestore"
         ],
         env: {
             CI: "1",
@@ -252,7 +253,7 @@ async function translateTrendRadarResult(content: string, isArticle: boolean = f
         ];
 
         // Usamos un modelo rápido pero capaz para esta tarea puntual
-        const { data } = await getLLMResponse(messages, index);
+        const data = await getLLMResponse(messages, index);
         return data.choices?.[0]?.message?.content || content;
     } catch (e) {
         console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);

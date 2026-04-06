@@ -11,7 +11,6 @@ export async function runFailureAudit(userId: number) {
         // Obtenemos las últimas 10 trazas del usuario sin filtros complejos para evitar requerir índices compuestos
         const snapshot = await dbFirestore.collection('traces')
             .where('user_id', '==', userId)
-            .orderBy('timestamp', 'desc')
             .limit(10)
             .get();
 

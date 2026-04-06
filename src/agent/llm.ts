@@ -3,7 +3,8 @@ import { env } from "../config/env.js";
 import { modelTracker } from "./modelTracker.js";
 
 const models = [
-    // 1. OpenRouter - Free Tier (Gemini 2.0 Flash Lite - Masivo Context Window y Quotas)
+    // 1. OpenRouter - Modelos Premium/Free con gran contexto
+    { name: "qwen/qwen3.6-plus:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
     { name: "google/gemini-2.0-flash-lite-001", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
     { name: "google/gemini-2.0-flash-001", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
 

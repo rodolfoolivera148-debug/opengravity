@@ -155,8 +155,9 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                 turnHistory.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls });
 
                 for (const toolCall of message.tool_calls) {
+                    let toolName = "unknown";
                     try {
-                        const toolName = toolCall.function.name;
+                        toolName = toolCall.function.name;
                         const toolArgs = JSON.parse(toolCall.function.arguments);
                         console.log(`   └─ Argumentos para ${toolName}:`, JSON.stringify(toolArgs));
 
