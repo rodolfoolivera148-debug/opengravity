@@ -189,7 +189,23 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
     // Interceptor de Parámetros y Calidad para TrendRadar
     const isTrendRadar = name.startsWith("mcp_trendradar_");
     if (isTrendRadar) {
-        // Solo inyectamos o limitamos el parámetro 'limit' en herramientas de búsqueda o listas
+        // 1. Mapeo de parámetros antiguos o alucinados
+        if (args.keywords && !args.query) {
+            args.query = args.keywords;
+            delete args.keywords;
+        }
+
+        if (name.includes("search_news")) {
+            // Manejar 'source: rss' como 'include_rss: true'
+            if (args.source === "rss" || args.include_rss) {
+                args.include_rss = true;
+            }
+            // Eliminar parámetros no soportados que causan ValidationError
+            delete args.source;
+            delete args.days;
+        }
+
+        // 2. Limitación de cantidad para evitar saturación
         const isListTool = name.includes("search") || name.includes("latest") || name.includes("_topics") || name.includes("_date");
         if (isListTool) {
             args.limit = Math.min(args.limit || 5, 5); 

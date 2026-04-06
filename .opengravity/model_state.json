@@ -8,7 +8,7 @@
   "qwen/qwen3.6-plus:free": {
     "name": "qwen/qwen3.6-plus:free",
     "provider": "openrouter",
-    "available": true,
-    "retryAfter": 0
+    "available": false,
+    "retryAfter": 1775448959288
   }
 }
