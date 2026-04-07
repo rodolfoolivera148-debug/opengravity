@@ -195,18 +195,28 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
             delete args.keywords;
         }
 
-        if (name.includes("search_news")) {
-            // Manejar 'source: rss' como 'include_rss: true'
-            if (args.source === "rss" || args.include_rss) {
-                args.include_rss = true;
+        if (name.includes("search_news") || name.includes("search_rss")) {
+            // Optimización de Consulta (De Español a Chino/Inglés)
+            if (args.query || args.keyword) {
+                const originalQuery = args.query || args.keyword;
+                const optimizedQuery = await translateTrendRadarQuery(originalQuery);
+                if (args.query) args.query = optimizedQuery;
+                if (args.keyword) args.keyword = optimizedQuery;
             }
-            // Eliminar parámetros no soportados que causan ValidationError
-            delete args.source;
-            delete args.days;
+
+            if (name.includes("search_news")) {
+                // Manejar 'source: rss' como 'include_rss: true'
+                if (args.source === "rss" || args.include_rss) {
+                    args.include_rss = true;
+                }
+                // Eliminar parámetros no soportados que causan ValidationError
+                delete args.source;
+                delete args.days;
+            }
         }
 
         // 2. Limitación de cantidad para evitar saturación
-        const isListTool = name.includes("search") || name.includes("latest") || name.includes("_topics") || name.includes("_date");
+        const isListTool = name.includes("search") || name.includes("latest") || name.includes("_topics") || (name.includes("_date") && !name.includes("list_available_dates"));
         if (isListTool) {
             args.limit = Math.min(args.limit || 5, 5); 
             // Siempre incluimos la URL en las listas para que el agente pueda leerlas después
@@ -224,7 +234,11 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
         const contentArr = result.content as any[];
         let finalResponse = contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
 
-        if (isTrendRadar && !finalResponse.includes("Error")) {
+        if (isTrendRadar && !finalResponse.toLowerCase().includes("error")) {
+            // 1. Formatear JSON a Markdown para mejor legibilidad
+            finalResponse = formatTrendRadarResults(finalResponse, originalName);
+
+            // 2. Traducir si es necesario
             console.log(`[MCP] 🌐 Traduciendo resultados de ${name}...`);
             const isArticle = name.includes("read_article");
             finalResponse = await translateTrendRadarResult(finalResponse, isArticle);
@@ -233,6 +247,55 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
         return finalResponse;
     } catch (error: any) {
         return `Error en herramienta MCP (${name}): ${error.message}`;
+    }
+}
+
+/**
+ * Formateador de Resultados: Convierte JSON técnico de TrendRadar en Markdown amigable.
+ */
+function formatTrendRadarResults(jsonStr: string, toolName: string): string {
+    try {
+        const data = JSON.parse(jsonStr);
+        if (!data.success && data.error) {
+            return `❌ ERROR EN TRENDRADAR: ${data.error.message || JSON.stringify(data.error)}`;
+        }
+
+        let output = "";
+        const items = data.data || data.hot_news || data.items || [];
+        const rssItems = data.rss || [];
+
+        if (items.length === 0 && rssItems.length === 0) {
+            return "No se encontraron noticias ni tendencias para esta búsqueda.";
+        }
+
+        if (items.length > 0) {
+            output += `### 📈 Tendencias / Noticias Encontradas:\n`;
+            items.forEach((item: any, i: number) => {
+                output += `${i + 1}. **${item.title}**\n`;
+                if (item.platform_name) output += `   - Fuente: ${item.platform_name}\n`;
+                if (item.url) output += `   - [Ver más](${item.url})\n`;
+                if (item.summary) output += `   - Resumen: ${item.summary}\n`;
+            });
+            output += "\n";
+        }
+
+        if (rssItems.length > 0) {
+            output += `### 📰 Resultados RSS / Especializados:\n`;
+            rssItems.forEach((item: any, i: number) => {
+                output += `${i + 1}. **${item.title}**\n`;
+                if (item.feed_name) output += `   - Canal: ${item.feed_name}\n`;
+                if (item.link || item.url) output += `   - [Leer Artículo](${item.link || item.url})\n`;
+                if (item.description || item.summary) {
+                    const desc = (item.description || item.summary).substring(0, 200);
+                    output += `   - Resumen: ${desc}...\n`;
+                }
+            });
+        }
+
+        return output || jsonStr;
+    } catch (e) {
+        // Si no es JSON o falla el parseo, devolver original
+        return jsonStr;
     }
 }
 
@@ -274,5 +337,36 @@ async function translateTrendRadarResult(content: string, isArticle: boolean = f
     } catch (e) {
         console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);
         return content; // Fallback al contenido original si la traducción falla
+    }
+}
+
+/**
+ * Interceptor de Consulta: Optimiza el término de búsqueda de Rodolfo para fuentes en Chino/Inglés.
+ */
+async function translateTrendRadarQuery(query: string): Promise<string> {
+    try {
+        const index = getInitialModelIndex();
+        
+        const systemPrompt = `Eres un experto en optimización de búsquedas internacionales.
+Tu tarea es convertir un término de búsqueda en español a su equivalente más EFECTIVO para encontrar noticias en China (Baidu, Weibo) o medios en inglés (HackerNews, TechCrunch).
+
+REGLAS:
+1. Responde SOLO con el término optimizado (ej: "AI" o "人工智能").
+2. Prioriza el CHINO si el tema es local de China o tecnología hardware.
+3. Prioriza el INGLÉS si es tecnología software o ciencia global.
+4. NUNCA respondas con explicaciones.`;
+
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Optimiza esta búsqueda: "${query}"` }
+        ];
+
+        const data = await getLLMResponse(messages, index);
+        const optimized = data.choices?.[0]?.message?.content?.trim().replace(/"/g, '') || query;
+        console.log(`[MCP] 🔍 Búsqueda optimizada: "${query}" -> "${optimized}"`);
+        return optimized;
+    } catch (e) {
+        console.error("[MCP] ❌ Fallo en Optimización de Búsqueda:", e);
+        return query;
     }
 }
