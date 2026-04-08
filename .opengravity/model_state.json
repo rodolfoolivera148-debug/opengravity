@@ -9,6 +9,6 @@
     "name": "qwen/qwen3.6-plus:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1775496885030
+    "retryAfter": 1775531476399
   }
 }
