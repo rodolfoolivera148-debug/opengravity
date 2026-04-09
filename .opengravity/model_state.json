@@ -10,5 +10,17 @@
     "provider": "openrouter",
     "available": true,
     "retryAfter": 1775531476399
+  },
+  "google/gemini-2.0-flash-lite-preview-02-05:free": {
+    "name": "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "meta-llama/llama-3.3-70b-instruct:free": {
+    "name": "meta-llama/llama-3.3-70b-instruct:free",
+    "provider": "openrouter",
+    "available": false,
+    "retryAfter": 1775710852639
   }
 }
