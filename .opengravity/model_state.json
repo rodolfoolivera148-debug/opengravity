@@ -21,6 +21,28 @@
     "name": "meta-llama/llama-3.3-70b-instruct:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1775713263888
+    "retryAfter": 1775736837181
+  },
+  "google/gemma-4-27b-it:free": {
+    "name": "google/gemma-4-27b-it:free",
+    "provider": "openrouter",
+    "available": true,
+    "retryAfter": 0
+  },
+  "llama-3.3-70b-versatile": {
+    "name": "llama-3.3-70b-versatile",
+    "provider": "groq",
+    "available": true,
+    "retryAfter": 0,
+    "remainingRequests": 1000,
+    "remainingTokens": 12000
+  },
+  "llama-3.1-8b-instant": {
+    "name": "llama-3.1-8b-instant",
+    "provider": "groq",
+    "available": true,
+    "retryAfter": 0,
+    "remainingRequests": 14400,
+    "remainingTokens": 6000
   }
 }
