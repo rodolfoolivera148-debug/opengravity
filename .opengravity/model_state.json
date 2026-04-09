@@ -21,7 +21,7 @@
     "name": "meta-llama/llama-3.3-70b-instruct:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1775736837181
+    "retryAfter": 1775745111887
   },
   "google/gemma-4-27b-it:free": {
     "name": "google/gemma-4-27b-it:free",
@@ -44,5 +44,11 @@
     "retryAfter": 0,
     "remainingRequests": 14400,
     "remainingTokens": 6000
+  },
+  "google/gemma-4-26b-a4b-it:free": {
+    "name": "google/gemma-4-26b-a4b-it:free",
+    "provider": "openrouter",
+    "available": false,
+    "retryAfter": 1775745116566
   }
 }
