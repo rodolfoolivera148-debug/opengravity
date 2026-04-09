@@ -8,7 +8,6 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { dbFirestore } from "../config/firebase.js";
 import { env } from "../config/env.js";
-import { getLLMResponse, getInitialModelIndex } from "./llm.js";
 
 interface McpServerConfig {
     name: string;
@@ -194,28 +193,39 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
             args.query = args.keywords;
             delete args.keywords;
         }
+        if (args.keyword && !args.query) {
+            args.query = args.keyword;
+            delete args.keyword;
+        }
+
+        // 2. Eliminar agresivamente parámetros que el LLM inventa y causan ValidationError
+        const hallucinated = [
+            'source_countries', 'country', 'countries', 'language', 'lang',
+            'date_from', 'date_to', 'start_date', 'end_date', 'sort',
+            'sort_by', 'order', 'format', 'category', 'type', 'max_results',
+            'page', 'offset', 'fields', 'output_format', 'time_range',
+            'time_period', 'period', 'range', 'since', 'until', 'before', 'after'
+        ];
+        for (const param of hallucinated) {
+            delete args[param];
+        }
 
         if (name.includes("search_news") || name.includes("search_rss")) {
-            // Optimización de Consulta (De Español a Chino/Inglés)
-            if (args.query || args.keyword) {
-                const originalQuery = args.query || args.keyword;
-                const optimizedQuery = await translateTrendRadarQuery(originalQuery);
-                if (args.query) args.query = optimizedQuery;
-                if (args.keyword) args.keyword = optimizedQuery;
+            // Optimización de Consulta: mapa estático (NO usa LLM para evitar rate limits)
+            if (args.query) {
+                args.query = optimizeSearchQuery(args.query);
             }
 
             if (name.includes("search_news")) {
-                // Manejar 'source: rss' como 'include_rss: true'
                 if (args.source === "rss" || args.include_rss) {
                     args.include_rss = true;
                 }
-                // Eliminar parámetros no soportados que causan ValidationError
                 delete args.source;
                 delete args.days;
             }
         }
 
-        // 2. Limitación de cantidad para evitar saturación
+        // 3. Limitación de cantidad para evitar saturación
         const isListTool = name.includes("search") || name.includes("latest") || name.includes("_topics") || (name.includes("_date") && !name.includes("list_available_dates"));
         if (isListTool) {
             args.limit = Math.min(args.limit || 5, 5); 
@@ -235,13 +245,8 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
         let finalResponse = contentArr.map(c => c.text || JSON.stringify(c)).join("\n");
 
         if (isTrendRadar && !finalResponse.toLowerCase().includes("error")) {
-            // 1. Formatear JSON a Markdown para mejor legibilidad
+            // Formatear JSON a Markdown para mejor legibilidad (sin LLM, sin rate limits)
             finalResponse = formatTrendRadarResults(finalResponse, originalName);
-
-            // 2. Traducir si es necesario
-            console.log(`[MCP] 🌐 Traduciendo resultados de ${name}...`);
-            const isArticle = name.includes("read_article");
-            finalResponse = await translateTrendRadarResult(finalResponse, isArticle);
         }
 
         return finalResponse;
@@ -341,73 +346,58 @@ function formatTrendRadarResults(jsonStr: string, toolName: string): string {
 }
 
 /**
- * Helper dedicado para traducir los resultados de TrendRadar de forma aislada.
- * Esto evita que el Agente principal "se salte" la traducción por saturación.
+ * Optimizador de consultas ESTÁTICO — NO usa LLM, no consume rate limits.
+ * Traduce términos comunes de español a inglés para mejorar resultados de búsqueda.
  */
-async function translateTrendRadarResult(content: string, isArticle: boolean = false): Promise<string> {
-    try {
-        const index = getInitialModelIndex();
-        
-        let systemPrompt = `Eres un traductor experto de Chino a Español. Tu tarea es traducir los resultados de noticias.`;
-        
-        if (isArticle) {
-            systemPrompt += `\nREGLAS PARA ARTÍCULOS COMPLETOS:
-1. El contenido es un artículo en Markdown obtenido vía Jina Reader.
-2. Traduce el contenido completo al español manteniendo el formato Markdown (títulos, negritas, enlaces).
-3. Asegura que el tono sea profesional e informativo.
-4. Si el texto es muy extenso, prioriza la traducción de los párrafos principales y conclusiones.`;
-        } else {
-            systemPrompt += `\nREGLAS PARA TITULARES:
-1. Mantén la estructura original de los resultados (plataformas, listas, etc.).
-2. Traduce todos los titulares al español de forma natural y atractiva.
-3. Si hay términos en inglés (ej: AI, Tesla), mantenlos o tradúcelos según el contexto.`;
+function optimizeSearchQuery(query: string): string {
+    const q = query.toLowerCase().trim();
+    const translations: Record<string, string> = {
+        'inteligencia artificial': 'artificial intelligence',
+        'aprendizaje automático': 'machine learning',
+        'aprendizaje profundo': 'deep learning',
+        'computación cuántica': 'quantum computing',
+        'energía renovable': 'renewable energy',
+        'cambio climático': 'climate change',
+        'guerra comercial': 'trade war',
+        'ciberseguridad': 'cybersecurity',
+        'semiconductores': 'semiconductors',
+        'vehículos eléctricos': 'electric vehicles',
+        'robótica': 'robotics',
+        'biotecnología': 'biotechnology',
+        'economía': 'economy',
+        'política': 'politics',
+        'tecnología': 'technology',
+        'ciencia': 'science',
+        'salud': 'health',
+        'finanzas': 'finance',
+        'criptomonedas': 'cryptocurrency',
+        'blockchain': 'blockchain',
+        'espacial': 'space',
+        'defensa': 'defense',
+        'educación': 'education',
+        'noticias': 'news',
+        'china': 'China',
+        'eeuu': 'USA',
+        'estados unidos': 'United States',
+        'europa': 'Europe',
+    };
+
+    // Buscar coincidencia exacta primero
+    if (translations[q]) {
+        console.log(`[MCP] 🔍 Búsqueda optimizada: "${query}" -> "${translations[q]}"`);
+        return translations[q];
+    }
+
+    // Buscar coincidencia parcial
+    for (const [es, en] of Object.entries(translations)) {
+        if (q.includes(es)) {
+            const optimized = q.replace(es, en);
+            console.log(`[MCP] 🔍 Búsqueda optimizada: "${query}" -> "${optimized}"`);
+            return optimized;
         }
-
-        systemPrompt += `\n\nREGLAS GENERALES:
-- Responde SOLO con el contenido traducido, sin preámbulos ni explicaciones.
-- Si el contenido ya parece estar en español, devuélvelo tal cual.`;
-
-        const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: content }
-        ];
-
-        // Usamos un modelo rápido pero capaz para esta tarea puntual
-        const data = await getLLMResponse(messages, index);
-        return data.choices?.[0]?.message?.content || content;
-    } catch (e) {
-        console.error("[MCP] ❌ Fallo en Traducción Interceptor:", e);
-        return content; // Fallback al contenido original si la traducción falla
     }
-}
 
-/**
- * Interceptor de Consulta: Optimiza el término de búsqueda de Rodolfo para fuentes en Chino/Inglés.
- */
-async function translateTrendRadarQuery(query: string): Promise<string> {
-    try {
-        const index = getInitialModelIndex();
-        
-        const systemPrompt = `Eres un experto en optimización de búsquedas internacionales.
-Tu tarea es convertir un término de búsqueda en español a su equivalente más EFECTIVO para encontrar noticias en China (Baidu, Weibo) o medios en inglés (HackerNews, TechCrunch).
-
-REGLAS:
-1. Responde SOLO con el término optimizado (ej: "AI" o "人工智能").
-2. Prioriza el CHINO si el tema es local de China o tecnología hardware.
-3. Prioriza el INGLÉS si es tecnología software o ciencia global.
-4. NUNCA respondas con explicaciones.`;
-
-        const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Optimiza esta búsqueda: "${query}"` }
-        ];
-
-        const data = await getLLMResponse(messages, index);
-        const optimized = data.choices?.[0]?.message?.content?.trim().replace(/"/g, '') || query;
-        console.log(`[MCP] 🔍 Búsqueda optimizada: "${query}" -> "${optimized}"`);
-        return optimized;
-    } catch (e) {
-        console.error("[MCP] ❌ Fallo en Optimización de Búsqueda:", e);
-        return query;
-    }
+    // Si no hay traducción, pasar el query tal cual
+    console.log(`[MCP] 🔍 Búsqueda sin traducción: "${query}"`);
+    return query;
 }

@@ -5,7 +5,7 @@ import { modelTracker } from "./modelTracker.js";
 const models = [
     // 1. OpenRouter - Free tier (IDs verificados abril 2026)
     { name: "meta-llama/llama-3.3-70b-instruct:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
-    { name: "google/gemma-4-27b-it:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
+    { name: "google/gemma-4-26b-a4b-it:free", provider: "openrouter", apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" },
 
     // 2. Groq - Alta velocidad (fallbacks confiables)
     { name: "llama-3.3-70b-versatile", provider: "groq", apiKey: env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" },
