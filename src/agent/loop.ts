@@ -116,7 +116,7 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
             try {
                 const parsed = JSON.parse(msg.content);
                 let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
-                const limit = 10000;
+                const limit = 4000;
                 if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "... [truncado]";
                 return { role: 'tool', tool_call_id: parsed.tool_call_id, content: contentStr };
             } catch (e) { }
@@ -181,8 +181,10 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
                         }
 
                         await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolName, result }));
-                        turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
-                        traceData.results.push(result);
+                        let resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+                        if (resultStr.length > 4000) resultStr = resultStr.substring(0, 4000) + "... [truncado para evitar rate limits]";
+                        turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: resultStr });
+                        traceData.results.push(resultStr);
                     } catch (toolError: any) {
                         const result = `Error interno: ${toolError.message}`;
                         await saveMessage(userId, 'tool', JSON.stringify({ 
