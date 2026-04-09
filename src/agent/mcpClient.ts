@@ -256,25 +256,66 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
 function formatTrendRadarResults(jsonStr: string, toolName: string): string {
     try {
         const data = JSON.parse(jsonStr);
-        if (!data.success && data.error) {
+
+        // Detectar errores explícitos del servidor
+        if (data.success === false && data.error) {
             return `❌ ERROR EN TRENDRADAR: ${data.error.message || JSON.stringify(data.error)}`;
         }
 
-        let output = "";
-        const items = data.data || data.hot_news || data.items || [];
-        const rssItems = data.rss || [];
+        // Extraer el array de items de cualquier campo conocido
+        const knownArrayFields = ['data', 'hot_news', 'items', 'results', 'news', 'articles', 'feeds', 'topics'];
+        let items: any[] = [];
+        let rssItems: any[] = [];
+
+        // Buscar cualquier array en el objeto raíz
+        for (const field of knownArrayFields) {
+            if (Array.isArray(data[field]) && data[field].length > 0) {
+                items = data[field];
+                break;
+            }
+        }
+        if (Array.isArray(data.rss) && data.rss.length > 0) rssItems = data.rss;
+
+        // Si no encontramos nada en campos conocidos, buscar cualquier array
+        if (items.length === 0 && rssItems.length === 0) {
+            for (const val of Object.values(data)) {
+                if (Array.isArray(val) && val.length > 0) { items = val; break; }
+            }
+        }
 
         if (items.length === 0 && rssItems.length === 0) {
+            // Puede ser un objeto simple con datos (ej: status de feeds)
+            if (typeof data === 'object' && !Array.isArray(data)) {
+                const lines = Object.entries(data)
+                    .filter(([k]) => k !== 'success')
+                    .map(([k, v]) => `- **${k}:** ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+                return lines.length > 0 ? lines.join('\n') : jsonStr;
+            }
             return "No se encontraron noticias ni tendencias para esta búsqueda.";
         }
+
+        let output = "";
 
         if (items.length > 0) {
             output += `### 📈 Tendencias / Noticias Encontradas:\n`;
             items.forEach((item: any, i: number) => {
-                output += `${i + 1}. **${item.title}**\n`;
-                if (item.platform_name) output += `   - Fuente: ${item.platform_name}\n`;
-                if (item.url) output += `   - [Ver más](${item.url})\n`;
-                if (item.summary) output += `   - Resumen: ${item.summary}\n`;
+                if (typeof item === 'string') {
+                    output += `${i + 1}. ${item}\n`;
+                    return;
+                }
+                // Buscar el título en múltiples campos posibles
+                const title = item.title || item.name || item.keyword || item.topic || item.headline || JSON.stringify(item).substring(0, 80);
+                output += `${i + 1}. **${title}**\n`;
+                const source = item.platform_name || item.source || item.feed_name || item.platform || '';
+                if (source) output += `   - Fuente: ${source}\n`;
+                const url = item.url || item.link || item.href || '';
+                if (url) output += `   - [Ver más](${url})\n`;
+                const summary = item.summary || item.description || item.content || item.snippet || '';
+                if (summary) output += `   - Resumen: ${String(summary).substring(0, 250)}...\n`;
+                // Info adicional según tipo de herramienta
+                if (item.count !== undefined) output += `   - Menciones: ${item.count}\n`;
+                if (item.heat !== undefined) output += `   - Heat: ${item.heat}\n`;
+                if (item.published_at || item.pub_date) output += `   - Fecha: ${item.published_at || item.pub_date}\n`;
             });
             output += "\n";
         }
@@ -282,17 +323,17 @@ function formatTrendRadarResults(jsonStr: string, toolName: string): string {
         if (rssItems.length > 0) {
             output += `### 📰 Resultados RSS / Especializados:\n`;
             rssItems.forEach((item: any, i: number) => {
-                output += `${i + 1}. **${item.title}**\n`;
+                const title = item.title || item.name || JSON.stringify(item).substring(0, 80);
+                output += `${i + 1}. **${title}**\n`;
                 if (item.feed_name) output += `   - Canal: ${item.feed_name}\n`;
-                if (item.link || item.url) output += `   - [Leer Artículo](${item.link || item.url})\n`;
-                if (item.description || item.summary) {
-                    const desc = (item.description || item.summary).substring(0, 200);
-                    output += `   - Resumen: ${desc}...\n`;
-                }
+                const url = item.link || item.url || '';
+                if (url) output += `   - [Leer Artículo](${url})\n`;
+                const desc = item.description || item.summary || '';
+                if (desc) output += `   - Resumen: ${String(desc).substring(0, 200)}...\n`;
             });
         }
 
-        return output || jsonStr;
+        return output.trim() || jsonStr;
     } catch (e) {
         // Si no es JSON o falla el parseo, devolver original
         return jsonStr;
