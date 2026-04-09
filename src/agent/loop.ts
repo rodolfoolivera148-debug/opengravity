@@ -52,10 +52,42 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     const promptOptimizations = await getPromptOptimizations(userId);
     if (promptOptimizations) console.log(`[Autoaprendizaje] Aplicando optimización de prompt activa.`);
 
+    // 1. Cargamos el historial ANTES para preservar tools y evitar ValidationError (Groq)
+    const historyLimit = modelIndex === 0 ? 5 : 12;
+    const historyData = await getMessages(userId, historyLimit);
+    
+    const historicalTools = new Set<string>();
+    let turnHistory = historyData.map(msg => {
+        if (msg.role === 'assistant') {
+            try {
+                const parsed = JSON.parse(msg.content);
+                if (parsed.tool_calls) {
+                    for (const tc of parsed.tool_calls) historicalTools.add(tc.function.name);
+                    return { role: 'assistant', content: parsed.content || null, tool_calls: parsed.tool_calls };
+                }
+            } catch (e) { }
+        }
+        if (msg.role === 'tool') {
+            try {
+                const parsed = JSON.parse(msg.content);
+                let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
+                const limit = 4000;
+                if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "... [truncado]";
+                return { role: 'tool', tool_call_id: parsed.tool_call_id, content: contentStr };
+            } catch (e) { }
+        }
+        return { role: msg.role, content: msg.content };
+    });
+
     // Filtrar herramientas (Estrategia 1: Híbrida)
     const localToolNames = ['execute_terminal_command', 'read_file', 'write_file', 'list_directory', 'get_current_time', 'execute_google_workspace_action'];
     const activeTools = allTools.filter(t => {
         const name = t.function.name;
+        
+        // --- WHITELIST DE SEGURIDAD PARA EVITAR ERROR 400 EN GROQ/MISTRAL/OPENROUTER ---
+        // Si la herramienta ya se usó en el historial, DEBE estar presente en la definición
+        if (historicalTools.has(name)) return true;
+
         if (localToolNames.includes(name)) return true;
         if (category === "ALL") return true;
         if (category === "FIREBASE" && name.startsWith("mcp_firebase_")) return true;
@@ -99,30 +131,6 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         (userProfile.length > 0 ? `\n\nLO QUE SÉ SOBRE RODOLFO (Memoria a Largo Plazo):\n- ${userProfile.join('\n- ')}` : "") +
         (learningContext ? `\n\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "") +
         (promptOptimizations ? `\n\n${promptOptimizations}` : "");
-
-    // 1. Cargamos el historial de forma más compacta para evitar TPM Limits (Groq)
-    const historyLimit = modelIndex === 0 ? 5 : 12;
-    const historyData = await getMessages(userId, historyLimit);
-    let turnHistory = historyData.map(msg => {
-        if (msg.role === 'assistant') {
-            try {
-                const parsed = JSON.parse(msg.content);
-                if (parsed.tool_calls) {
-                    return { role: 'assistant', content: parsed.content || null, tool_calls: parsed.tool_calls };
-                }
-            } catch (e) { }
-        }
-        if (msg.role === 'tool') {
-            try {
-                const parsed = JSON.parse(msg.content);
-                let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
-                const limit = 4000;
-                if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "... [truncado]";
-                return { role: 'tool', tool_call_id: parsed.tool_call_id, content: contentStr };
-            } catch (e) { }
-        }
-        return { role: msg.role, content: msg.content };
-    });
 
     while (toolIterations < MAX_TOOL_ITERATIONS) {
         toolIterations++;
