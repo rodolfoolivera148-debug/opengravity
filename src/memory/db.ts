@@ -1,7 +1,22 @@
 import Database from 'better-sqlite3';
 import { env } from '../config/env.js';
 
-const db = new Database(env.DB_PATH);
+// En modo nube (Render/Cloud Run), el filesystem es efímero — usar SQLite in-memory
+// En modo local, usar archivo persistente
+let db: InstanceType<typeof Database>;
+try {
+    const isCloud = !!env.WEBHOOK_URL;
+    if (isCloud) {
+        db = new Database(':memory:');
+        console.log("[DB] Modo nube detectado — usando SQLite in-memory (Firestore es la fuente primaria).");
+    } else {
+        db = new Database(env.DB_PATH);
+        console.log(`[DB] SQLite local inicializado: ${env.DB_PATH}`);
+    }
+} catch (e: any) {
+    console.warn(`[DB] Error abriendo SQLite (${e.message}), usando in-memory como fallback.`);
+    db = new Database(':memory:');
+}
 
 // Initialize tables
 db.exec(`

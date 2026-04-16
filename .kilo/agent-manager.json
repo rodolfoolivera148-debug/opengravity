@@ -1,5 +1,13 @@
 {
-  "worktrees": {},
+  "worktrees": {
+    "wt-1775879798636-1": {
+      "branch": "shining-holiday",
+      "path": "c:\\Users\\Rodolfo Olivera\\Desktop\\Opengravity\\.kilo\\worktrees\\shining-holiday",
+      "parentBranch": "main",
+      "createdAt": "2026-04-11T03:56:38.636Z",
+      "remote": "origin"
+    }
+  },
   "sessions": {},
   "sessionsCollapsed": true
 }

@@ -33,8 +33,20 @@ class ModelTracker {
         }
     }
 
+    private saveStatePending = false;
+
     private saveState() {
-        fs.writeFileSync(STATE_FILE, JSON.stringify(this.states, null, 2));
+        // Debounced async write — no bloquea el event loop
+        if (this.saveStatePending) return;
+        this.saveStatePending = true;
+        setTimeout(() => {
+            try {
+                fs.writeFileSync(STATE_FILE, JSON.stringify(this.states, null, 2));
+            } catch (e) {
+                console.warn("[ModelTracker] Error guardando estado:", e);
+            }
+            this.saveStatePending = false;
+        }, 100);
     }
 
     /**
@@ -95,6 +107,10 @@ class ModelTracker {
             }
             state.retryAfter = now + waitMs;
             console.warn(`[ModelTracker] ⚠️ Modelo ${modelName} marcado como NO DISPONIBLE hasta ${new Date(state.retryAfter).toLocaleTimeString()}`);
+        } else if (statusCode === 413) {
+            // 413 = Request Too Large — NO bloquear el modelo, el problema es el contexto, no el modelo
+            console.warn(`[ModelTracker] 📏 Modelo ${modelName}: contexto demasiado grande (413). El loop debe reducir contexto.`);
+            // Mantener el modelo disponible — loop.ts se encarga de reducir contexto
         } else if (statusCode === 401 || statusCode === 403) {
             // Error de autenticación, la API Key no sirve o fue revocada. Bloqueo prolongado.
             state.available = false;

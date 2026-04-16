@@ -7,6 +7,13 @@ memory.db
 *.db
 service-account.json
 
+# Credentials & Secrets
+credentials.json
+client_secret_*.json
+colab-mcp-oauth-config.json
+Keys.txt
+.opengravity/
+
 # Test files
 *_test.ts
 dump_messages.ts

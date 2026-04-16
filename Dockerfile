@@ -10,8 +10,8 @@ WORKDIR /app
 # Copia solo archivos de dependencias para aprovechar la caché de capas
 COPY package*.json ./
 
-# Instala dependencias (incluyendo dev para compilar)
-RUN npm install
+# Instala dependencias (incluyendo dev para compilar TypeScript)
+RUN npm install --include=dev
 
 # Copia el resto del código
 COPY . .
@@ -19,8 +19,11 @@ COPY . .
 # Compila el código TypeScript a JavaScript
 RUN npm run build
 
-# Elimina dependencias de desarrollo para ahorrar espacio (Opcional pero recomendado)
-# RUN npm prune --production
+# Elimina dependencias de desarrollo para ahorrar espacio
+RUN npm prune --omit=dev
+
+# Variables de entorno de producción
+ENV NODE_ENV=production
 
 # Puerto expuesto (Cloud Run usa la variable PORT por defecto)
 EXPOSE 3000

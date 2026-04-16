@@ -6,6 +6,8 @@ import { webhookCallback } from "grammy";
 async function main() {
     console.log("Iniciando OpenGravity v2.0...");
     
+    const isCloudMode = !!env.WEBHOOK_URL;
+
     // Express para Webhook/Cloud Run Salud
     const app = express();
     app.use(express.json());
@@ -14,8 +16,41 @@ async function main() {
         res.send("OpenGravity Bot is Online ✅");
     });
 
+    // ═══════════════════════════════════════════════════════════
+    // INFRAESTRUCTURA COMPARTIDA (se ejecuta en AMBOS modos)
+    // ═══════════════════════════════════════════════════════════
+    
+    // 1. Validar conexión a Cloud Firestore
+    try {
+        await import("./config/firebase.js");
+        console.log("✅ Conectado exitosamente a Firebase Firestore.");
+    } catch (e: any) {
+        console.error("⚠️ Firebase no disponible:", e.message);
+    }
+
+    // 2. Iniciar cliente MCP (graceful — no bloquea si servidores locales no están)
+    try {
+        const { initMcpClient } = await import("./agent/mcpClient.js");
+        await initMcpClient();
+    } catch (e: any) {
+        console.warn("⚠️ MCP Client no pudo inicializarse:", e.message);
+    }
+
+    // 3. Error handler global del bot
+    bot.catch((err: any) => {
+        const errMsg = err.description || err.message || "";
+        if (errMsg.includes("Conflict")) {
+            console.error("❌ Conflicto 409: La sesión anterior sigue activa. Reintentando en 20s...");
+            setTimeout(() => process.exit(1), 20000);
+        } else {
+            console.error("❌ Error en el bot de Telegram:", err);
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════
     // MODO WEBHOOK (Para Nube 100% Gratis - Cloud Run/Render)
-    if (env.WEBHOOK_URL) {
+    // ═══════════════════════════════════════════════════════════
+    if (isCloudMode) {
         console.log(`[Cloud] Modo Webhook Activo: ${env.WEBHOOK_URL}`);
         app.post("/webhook", webhookCallback(bot, "express"));
         
@@ -32,31 +67,15 @@ async function main() {
             console.error("❌ Error registrando Webhook:", e);
         }
     } else {
+        // ═══════════════════════════════════════════════════════════
         // MODO POLLING (Local/Desarrollo)
+        // ═══════════════════════════════════════════════════════════
         console.log("[Local] Modo Long Polling Activo...");
         app.listen(env.PORT, () => console.log(`[Local] Port ${env.PORT} listening for health checks.`));
 
-        // 1. Validar conexión a Cloud Firestore
-        await import("./config/firebase.js");
-        console.log("Conectado exitosamente a Firebase Firestore.");
-
-        // 2. Iniciar cliente MCP con el nuevo modo silencioso
-        const { initMcpClient } = await import("./agent/mcpClient.js");
-        await initMcpClient();
-
-        // 3. Buffer de seguridad extendido para evitar Conflicto 409 (Telegram)
+        // Buffer de seguridad extendido para evitar Conflicto 409 (Telegram)
         console.log("Conexión estabilizada. Aguardando a que instancias previas cierren (15s)...");
         await new Promise(r => setTimeout(r, 15000));
-
-        bot.catch((err: any) => {
-            const errMsg = err.description || err.message || "";
-            if (errMsg.includes("Conflict")) {
-                console.error("❌ Conflicto 409: La sesión anterior sigue activa. Reintentando en 20s...");
-                setTimeout(() => process.exit(1), 20000);
-            } else {
-                console.error("❌ Error en el bot de Telegram:", err);
-            }
-        });
 
         let started = false;
         let attempts = 0;

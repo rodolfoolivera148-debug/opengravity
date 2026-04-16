@@ -10,6 +10,7 @@ import { PROMPTS } from "../config/prompts.js";
 import { runFailureAudit } from "./auditor.js";
 
 const MAX_TOOL_ITERATIONS = 12;
+const TOOL_RESULT_LIMIT = 2000; // Límite de caracteres para resultados de herramientas
 
 export async function runAgentLoop(userId: number, userMessage: string): Promise<string> {
     const currentState = await getGlobalState(userId);
@@ -53,7 +54,8 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     if (promptOptimizations) console.log(`[Autoaprendizaje] Aplicando optimización de prompt activa.`);
 
     // 1. Cargamos el historial ANTES para preservar tools y evitar ValidationError (Groq)
-    const historyLimit = modelIndex === 0 ? 5 : 12;
+    // IMPORTANTE: Groq free tier tiene 6000-12000 TPM. Con 5 msgs × 500 chars = ~2500 tokens de historial.
+    const historyLimit = 5; // Máximo 5 mensajes de historial para todos los modelos
     const historyData = await getMessages(userId, historyLimit);
     
     const historicalTools = new Set<string>();
@@ -71,33 +73,46 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
             try {
                 const parsed = JSON.parse(msg.content);
                 let contentStr = typeof parsed.result === 'string' ? parsed.result : JSON.stringify(parsed.result);
-                const limit = 4000;
-                if (contentStr.length > limit) contentStr = contentStr.substring(0, limit) + "... [truncado]";
+                // TRUNCADO AGRESIVO: 500 chars máx por resultado de herramienta del historial
+                // Esto es crucial para que el contexto quepa en Groq (6000 TPM)
+                if (contentStr.length > 500) contentStr = contentStr.substring(0, 500) + "... [truncado]";
                 return { role: 'tool', tool_call_id: parsed.tool_call_id, content: contentStr };
             } catch (e) { }
         }
         return { role: msg.role, content: msg.content };
     });
 
-    // Filtrar herramientas (Estrategia 1: Híbrida)
-    const localToolNames = ['execute_terminal_command', 'read_file', 'write_file', 'list_directory', 'get_current_time', 'execute_google_workspace_action'];
+    // Filtrar herramientas (Estrategia: Context-Budget-Aware)
+    // Cada tool definition consume ~100-200 tokens. Con 30 tools = ~4500 tokens solo en definiciones.
+    // Para Groq (12000 TPM), máximo ~10 tools para dejar espacio al prompt y respuesta.
+    const localToolNames = ['get_current_time'];
+    const ESSENTIAL_TRENDRADAR_TOOLS = new Set([
+        'mcp_trendradar_search_news',
+        'mcp_trendradar_get_latest_news', 
+        'mcp_trendradar_get_news_by_date',
+        'mcp_trendradar_search_rss',
+        'mcp_trendradar_get_latest_rss',
+        'mcp_trendradar_read_article',
+        'mcp_trendradar_get_trending_topics',
+    ]);
     const activeTools = allTools.filter(t => {
         const name = t.function.name;
         
-        // --- WHITELIST DE SEGURIDAD PARA EVITAR ERROR 400 EN GROQ/MISTRAL/OPENROUTER ---
-        // Si la herramienta ya se usó en el historial, DEBE estar presente en la definición
+        // Herramientas del historial DEBEN estar presentes para evitar 400 en Groq
         if (historicalTools.has(name)) return true;
 
         if (localToolNames.includes(name)) return true;
-        if (category === "ALL") return true;
         if (category === "FIREBASE" && name.startsWith("mcp_firebase_")) return true;
         if (category === "COLAB" && name.startsWith("mcp_colab_")) return true;
         if (category === "WORKSPACE" && name.startsWith("mcp_workspace_")) return true;
-        if (category === "NEWS" && name.startsWith("mcp_trendradar_")) return true;
+        
+        // NEWS: Solo las 7 herramientas core de TrendRadar, NO las 27
+        if (category === "NEWS" && ESSENTIAL_TRENDRADAR_TOOLS.has(name)) return true;
+        
         const msgLow = userMessage.toLowerCase();
-        // Ampliamos palabras clave para forzar inyección de herramientas de noticias
         const newsKeywords = ["rastre", "crawl", "trendradar", "notici", " ai", " ia", "artificial", "tecnolog", "china", "shanghai", "beijing"];
-        if (name.startsWith("mcp_trendradar_") && newsKeywords.some(kw => msgLow.includes(kw))) return true;
+        if (ESSENTIAL_TRENDRADAR_TOOLS.has(name) && newsKeywords.some(kw => msgLow.includes(kw))) return true;
+        
         return false;
     });
 
@@ -105,11 +120,12 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
     let capabilities = getMcpStatus();
     
     // Inyectar Superpoderes (Metodología)
+    let superpowersContent = "";
     try {
         const superPath = path.resolve(process.cwd(), "superpowers/skills/using-superpowers/SKILL.md");
         if (fs.existsSync(superPath)) {
-            const superContent = fs.readFileSync(superPath, "utf-8");
-            capabilities += `\n\nMETODOLOGÍA DE SUPERPODERES (Cómo debes operar):\n${superContent}`;
+            superpowersContent = fs.readFileSync(superPath, "utf-8");
+            capabilities += `\n\nMETODOLOGÍA DE SUPERPODERES (Cómo debes operar):\n${superpowersContent}`;
         }
     } catch (e) {
         console.warn("[Loop] No se pudo leer Superpowers SKILL.md");
@@ -127,24 +143,54 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
         }
     }
 
-    const SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState, capabilities) + 
+    // System prompt COMPLETO (para modelos con contexto grande)
+    const FULL_SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState, capabilities) + 
         (userProfile.length > 0 ? `\n\nLO QUE SÉ SOBRE RODOLFO (Memoria a Largo Plazo):\n- ${userProfile.join('\n- ')}` : "") +
         (learningContext ? `\n\nMEMORIA DE ÉXITO (Úsala como ejemplo):\n${learningContext}` : "") +
         (promptOptimizations ? `\n\n${promptOptimizations}` : "");
 
+    // System prompt REDUCIDO (para modelos con contexto limitado — Groq free tier)
+    const LITE_SYSTEM_PROMPT = PROMPTS.DEFAULT_SYSTEM(category, currentState, getMcpStatus());
+
+    let contextReduced = false; // Flag para saber si ya redujimos contexto por 413
+
     while (toolIterations < MAX_TOOL_ITERATIONS) {
         toolIterations++;
 
+        // Seleccionar prompt y tools según contexto
+        const currentPrompt = contextReduced ? LITE_SYSTEM_PROMPT : FULL_SYSTEM_PROMPT;
+        const currentTools = contextReduced 
+            ? activeTools.filter(t => {
+                const name = t.function.name;
+                // En modo reducido: solo tools locales esenciales + tools de la categoría activa
+                const localToolNames = ['get_current_time'];
+                if (localToolNames.includes(name)) return true;
+                if (category === "NEWS" && name.startsWith("mcp_trendradar_")) {
+                    // Solo las herramientas core de TrendRadar
+                    return name.includes("search_news") || name.includes("get_latest") || name.includes("search_rss");
+                }
+                if (category === "FIREBASE" && name.startsWith("mcp_firebase_")) return true;
+                if (category === "COLAB" && name.startsWith("mcp_colab_")) return true;
+                // Incluir herramientas ya usadas en el historial
+                if (historicalTools.has(name)) return true;
+                return false;
+            })
+            : activeTools;
+
         const messages = [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: currentPrompt },
             ...turnHistory
         ];
         
-        console.log(`[AgentLoop] Iter ${toolIterations} | Contexto: ${messages.length} mensajes (Giro: ${turnHistory.length})`);
+        if (contextReduced) {
+            console.log(`[AgentLoop] Iter ${toolIterations} | MODO LITE | ${messages.length} msgs, ${currentTools.length} tools`);
+        } else {
+            console.log(`[AgentLoop] Iter ${toolIterations} | Contexto: ${messages.length} mensajes (Giro: ${turnHistory.length})`);
+        }
 
         try {
             // Filtrar herramientas activas por categoría para reducir tamaño de prompt (Estrategia 2: Context-Aware Loading)
-            const response = await getLLMResponse(messages, modelIndex, activeTools);
+            const response = await getLLMResponse(messages, modelIndex, currentTools);
             const message = response.choices[0].message;
 
             if (message.content) {
@@ -190,7 +236,8 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
 
                         await saveMessage(userId, 'tool', JSON.stringify({ tool_call_id: toolCall.id, name: toolName, result }));
                         let resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-                        if (resultStr.length > 4000) resultStr = resultStr.substring(0, 4000) + "... [truncado para evitar rate limits]";
+                        const limit = contextReduced ? 1000 : TOOL_RESULT_LIMIT;
+                        if (resultStr.length > limit) resultStr = resultStr.substring(0, limit) + "... [truncado]";
                         turnHistory.push({ role: 'tool', tool_call_id: toolCall.id, content: resultStr });
                         traceData.results.push(resultStr);
                     } catch (toolError: any) {
@@ -217,6 +264,32 @@ export async function runAgentLoop(userId: number, userMessage: string): Promise
 
         } catch (error: any) {
             console.error(`[AgentLoop Error]: ${error.message}`);
+            
+            // --- MANEJO INTELIGENTE DE 413 (Context Too Large) ---
+            if (error.message.includes('413') && !contextReduced) {
+                console.warn(`[AgentLoop] ⚠️ Contexto demasiado grande. Reduciendo y reintentando mismo modelo...`);
+                contextReduced = true;
+                
+                // 1. Reducir historial: mantener solo último 30% de turnHistory
+                const keepCount = Math.max(2, Math.ceil(turnHistory.length * 0.3));
+                turnHistory = turnHistory.slice(-keepCount);
+                
+                // 2. Truncar resultados de tool en historial existente
+                turnHistory = turnHistory.map(msg => {
+                    if (msg.role === 'tool' && msg.content && msg.content.length > 500) {
+                        return { ...msg, content: msg.content.substring(0, 500) + '... [reducido]' };
+                    }
+                    return msg;
+                });
+                
+                // 3. Reducir herramientas: solo locales + herramientas ya usadas en historial
+                // (activeTools ya tiene el filtro, pero lo reducimos más)
+                
+                toolIterations--; // No contar este intento
+                continue;
+            }
+            
+            // --- FALLBACK NORMAL: Escalar a siguiente modelo ---
             if (modelIndex < getModelCount() - 1) {
                 modelIndex++;
                 traceData.model_index = modelIndex;

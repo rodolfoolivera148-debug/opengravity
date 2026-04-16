@@ -63,8 +63,11 @@ export async function clearMessages(userId: number) {
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(env.OPENROUTER_API_KEY || ""); // Usando la misma key
-const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+// Embeddings requieren una Google API Key real (no OpenRouter)
+const googleApiKey = process.env.GOOGLE_API_KEY || "";
+const genAI = googleApiKey ? new GoogleGenerativeAI(googleApiKey) : null;
+const embeddingModel = genAI ? genAI.getGenerativeModel({ model: "text-embedding-004" }) : null;
+if (!googleApiKey) console.warn("[Memory] GOOGLE_API_KEY no configurada — embeddings semánticos desactivados.");
 
 /**
  * Persistencia de Trazas de Aprendizaje (LeJEPA / Self-Improving)
@@ -81,10 +84,12 @@ export async function saveTrace(userId: number, traceData: {
     try {
         // Generar embedding para búsqueda semántica (LeJEPA)
         let vector = null;
-        try {
-            const result = await embeddingModel.embedContent(traceData.user_message);
-            vector = result.embedding.values;
-        } catch (e) {}
+        if (embeddingModel) {
+            try {
+                const result = await embeddingModel.embedContent(traceData.user_message);
+                vector = result.embedding.values;
+            } catch (e) {}
+        }
 
         await dbFirestore.collection('traces').add({
             user_id: userId,

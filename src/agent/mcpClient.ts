@@ -61,6 +61,7 @@ const SERVERS: McpServerConfig[] = [
 
 let unifiedTools: any[] = [];
 const toolToClientMap = new Map<string, Client>();
+const toolOriginalNameMap = new Map<string, string>();
 const clients: Client[] = [];
 
 function resolveRefs(schema: any, defs: Record<string, any> = {}): any {
@@ -90,7 +91,7 @@ function sanitizeToolSchema(inputSchema: any): { type: string; properties: any; 
             const resolved = resolveRefs(propSchema as any, defs);
             sanitizedProperties[propName] = {
                 type: resolved.type || 'string',
-                description: (resolved.description || "").substring(0, 1024),
+                description: (resolved.description || "").substring(0, 100), // LIMITADO AGRESIVAMENTE PARA EVITAR 413 EN GROQ
                 ...(resolved.enum ? { enum: resolved.enum } : {}),
                 ...(resolved.properties ? { properties: resolved.properties } : {}),
                 ...(resolved.items ? { items: resolved.items } : {}),
@@ -111,11 +112,16 @@ export async function initMcpClient() {
     console.log(`[MCP] Iniciando ecosistema de herramientas...`);
     unifiedTools = [];
     toolToClientMap.clear();
+    toolOriginalNameMap.clear();
 
     const remoteUrl = await getRemoteColabUrl();
     if (remoteUrl) {
-        console.log(`[MCP] Detectada Science Lab remota en: ${remoteUrl}`);
-        SERVERS.push({ name: "science_lab", type: "sse", url: remoteUrl });
+        // Evitar duplicados si initMcpClient se llama más de una vez
+        const alreadyAdded = SERVERS.some(s => s.name === "science_lab");
+        if (!alreadyAdded) {
+            console.log(`[MCP] Detectada Science Lab remota en: ${remoteUrl}`);
+            SERVERS.push({ name: "science_lab", type: "sse", url: remoteUrl });
+        }
     }
 
     const TIMEOUT_MS = 240000; // 4 minutos de margen total
@@ -147,11 +153,12 @@ export async function initMcpClient() {
                         type: "function",
                         function: {
                             name: prefixedName,
-                            description: `[${config.name}] ${tool.description || ""}`.substring(0, 1024),
+                            description: `[${config.name}] ${tool.description || ""}`.substring(0, 250), // LIMITADO AGRESIVAMENTE PARA EVITAR 413
                             parameters: sanitizeToolSchema(tool.inputSchema),
                         }
                     });
                     toolToClientMap.set(prefixedName, client);
+                    toolOriginalNameMap.set(prefixedName, tool.name);
                 }
                 clients.push(client);
                 console.log(`[MCP] ✅ ${config.name} listo. (${toolsResponse.tools.length} herramientas)`);
@@ -181,21 +188,33 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
     const client = toolToClientMap.get(name);
     if (!client) throw new Error(`[MCP] Herramienta no encontrada o prefijo inválido: ${name}`);
 
-    // Extraemos el nombre original (quitando el prefijo mcp_servidor_)
-    const nameParts = name.split("_");
-    const originalName = nameParts.slice(2).join("_");
+    // Extraemos el nombre original usando el mapa (evita bugs con underscores en nombres de servidor)
+    const originalName = toolOriginalNameMap.get(name) || name.split("_").slice(2).join("_");
 
     // Interceptor de Parámetros y Calidad para TrendRadar
     const isTrendRadar = name.startsWith("mcp_trendradar_");
     if (isTrendRadar) {
-        // 1. Mapeo de parámetros antiguos o alucinados
-        if (args.keywords && !args.query) {
-            args.query = args.keywords;
-            delete args.keywords;
-        }
-        if (args.keyword && !args.query) {
-            args.query = args.keyword;
-            delete args.keyword;
+        // 1. Mapeo de parámetros antiguos o alucinados — CONDICIONAL por herramienta
+        if (name.includes("search_news")) {
+            // search_news usa 'query' → renombrar keyword/keywords → query
+            if (args.keywords && !args.query) {
+                args.query = args.keywords;
+                delete args.keywords;
+            }
+            if (args.keyword && !args.query) {
+                args.query = args.keyword;
+                delete args.keyword;
+            }
+        } else if (name.includes("search_rss")) {
+            // search_rss usa 'keyword' → renombrar query/keywords → keyword  
+            if (args.query && !args.keyword) {
+                args.keyword = args.query;
+                delete args.query;
+            }
+            if (args.keywords && !args.keyword) {
+                args.keyword = args.keywords;
+                delete args.keywords;
+            }
         }
 
         // 2. Eliminar agresivamente parámetros que el LLM inventa y causan ValidationError
@@ -210,18 +229,20 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
             delete args[param];
         }
 
-        if (name.includes("search_news") || name.includes("search_rss")) {
+        if (name.includes("search_news")) {
             // Optimización de Consulta: mapa estático (NO usa LLM para evitar rate limits)
             if (args.query) {
                 args.query = optimizeSearchQuery(args.query);
             }
-
-            if (name.includes("search_news")) {
-                if (args.source === "rss" || args.include_rss) {
-                    args.include_rss = true;
-                }
-                delete args.source;
-                delete args.days;
+            if (args.source === "rss" || args.include_rss) {
+                args.include_rss = true;
+            }
+            delete args.source;
+            delete args.days;
+        } else if (name.includes("search_rss")) {
+            // Optimizar keyword para search_rss
+            if (args.keyword) {
+                args.keyword = optimizeSearchQuery(args.keyword);
             }
         }
 

@@ -14,6 +14,7 @@ const envSchema = z.object({
     DB_PATH: z.string().default("./memory.db"),
     FIREBASE_PROJECT_ID: z.string().optional().default("opengravity-1234"),
     FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+    GOOGLE_API_KEY: z.string().optional(),
     PORT: z.string().default("3000"),
     WEBHOOK_URL: z.string().optional(),
 });
