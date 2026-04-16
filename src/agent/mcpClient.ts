@@ -237,12 +237,20 @@ export async function executeMcpTool(name: string, args: Record<string, any>): P
             if (args.source === "rss" || args.include_rss) {
                 args.include_rss = true;
             }
+            // Fix: Eliminar date_range si el LLM intentó usar lenguaje natural (ej: "última semana")
+            if (args.date_range && typeof args.date_range === 'string') {
+                delete args.date_range;
+            }
             delete args.source;
             delete args.days;
         } else if (name.includes("search_rss")) {
             // Optimizar keyword para search_rss
             if (args.keyword) {
                 args.keyword = optimizeSearchQuery(args.keyword);
+            }
+            // Fix: Eliminar date_range si el LLM intentó usar lenguaje natural
+            if (args.date_range && typeof args.date_range === 'string') {
+                delete args.date_range;
             }
         }
 

@@ -21,7 +21,7 @@
     "name": "meta-llama/llama-3.3-70b-instruct:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1776310947956
+    "retryAfter": 1776312275983
   },
   "google/gemma-4-27b-it:free": {
     "name": "google/gemma-4-27b-it:free",
@@ -33,9 +33,9 @@
     "name": "llama-3.3-70b-versatile",
     "provider": "groq",
     "available": true,
-    "retryAfter": 0,
-    "remainingRequests": 998,
-    "remainingTokens": 4272
+    "retryAfter": 1776311434458,
+    "remainingRequests": 997,
+    "remainingTokens": 9840
   },
   "llama-3.1-8b-instant": {
     "name": "llama-3.1-8b-instant",
@@ -49,6 +49,6 @@
     "name": "google/gemma-4-26b-a4b-it:free",
     "provider": "openrouter",
     "available": false,
-    "retryAfter": 1776310951272
+    "retryAfter": 1776312280205
   }
 }
