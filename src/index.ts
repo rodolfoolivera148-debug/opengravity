@@ -7,8 +7,6 @@ async function main() {
     console.log("Iniciando OpenGravity v2.0...");
     
     const isCloudMode = !!env.WEBHOOK_URL;
-
-    // Express para Webhook/Cloud Run Salud
     const app = express();
     app.use(express.json());
 
@@ -17,49 +15,54 @@ async function main() {
     });
 
     // ═══════════════════════════════════════════════════════════
-    // INFRAESTRUCTURA COMPARTIDA (se ejecuta en AMBOS modos)
+    // 1. INICIO INMEDIATO DEL SERVIDOR (Para Render/Cloud Run)
+    // ═══════════════════════════════════════════════════════════
+    const server = app.listen(env.PORT, () => {
+        console.log(`[System] Servidor ${isCloudMode ? 'Cloud' : 'Local'} activo en puerto ${env.PORT}`);
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. INFRAESTRUCTURA EN SEGUNDO PLANO
     // ═══════════════════════════════════════════════════════════
     
-    // 1. Validar conexión a Cloud Firestore
-    try {
-        await import("./config/firebase.js");
-        console.log("✅ Conectado exitosamente a Firebase Firestore.");
-    } catch (e: any) {
-        console.error("⚠️ Firebase no disponible:", e.message);
-    }
+    // Validar conexión a Cloud Firestore
+    const initFirebase = async () => {
+        try {
+            await import("./config/firebase.js");
+            console.log("✅ Conectado a Firebase Firestore.");
+        } catch (e: any) {
+            console.error("⚠️ Firebase error:", e.message);
+        }
+    };
 
-    // 2. Iniciar cliente MCP (graceful — no bloquea si servidores locales no están)
-    try {
-        const { initMcpClient } = await import("./agent/mcpClient.js");
-        await initMcpClient();
-    } catch (e: any) {
-        console.warn("⚠️ MCP Client no pudo inicializarse:", e.message);
-    }
+    // Iniciar cliente MCP (graceful)
+    const initMcp = async () => {
+        try {
+            const { initMcpClient } = await import("./agent/mcpClient.js");
+            await initMcpClient();
+            console.log("✅ Ecosistema MCP inicializado.");
+        } catch (e: any) {
+            console.warn("⚠️ MCP error:", e.message);
+        }
+    };
+
+    // Lanzamos inicializaciones
+    initFirebase();
+    initMcp();
 
     // 3. Error handler global del bot
     bot.catch((err: any) => {
         const errMsg = err.description || err.message || "";
-        if (errMsg.includes("Conflict")) {
-            console.error("❌ Conflicto 409: La sesión anterior sigue activa. Reintentando en 20s...");
-            setTimeout(() => process.exit(1), 20000);
-        } else {
-            console.error("❌ Error en el bot de Telegram:", err);
-        }
+        console.error("❌ Error en el bot de Telegram:", err);
     });
 
     // ═══════════════════════════════════════════════════════════
-    // MODO WEBHOOK (Para Nube 100% Gratis - Cloud Run/Render)
+    // 3. MODO WEBHOOK (Nube) vs POLLING (Local)
     // ═══════════════════════════════════════════════════════════
     if (isCloudMode) {
-        console.log(`[Cloud] Modo Webhook Activo: ${env.WEBHOOK_URL}`);
+        console.log(`[Cloud] Configurando Webhook en: ${env.WEBHOOK_URL}/webhook`);
         app.post("/webhook", webhookCallback(bot, "express"));
         
-        // Iniciar Servidor HTTP
-        app.listen(env.PORT, () => {
-            console.log(`[Cloud] Servidor Webhook escuchando en puerto ${env.PORT}`);
-        });
-
-        // Configurar Webhook en Telegram al iniciar
         try {
             await bot.api.setWebhook(`${env.WEBHOOK_URL}/webhook`);
             console.log("✅ Webhook registrado exitosamente en Telegram.");
