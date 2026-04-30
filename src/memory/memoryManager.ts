@@ -66,11 +66,65 @@ export async function clearMessages(userId: number) {
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Embeddings requieren una Google API Key real (no OpenRouter)
+// ─── Embeddings: soporta API Key o Service Account ───────────────────────────
 const googleApiKey = process.env.GOOGLE_API_KEY || "";
+const googleCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS || "";
+
 const genAI = googleApiKey ? new GoogleGenerativeAI(googleApiKey) : null;
 const embeddingModel = genAI ? genAI.getGenerativeModel({ model: "text-embedding-004" }) : null;
-if (!googleApiKey) console.warn("[Memory] GOOGLE_API_KEY no configurada — embeddings semánticos desactivados.");
+
+if (!googleApiKey && !googleCredentials) {
+    console.warn("[Memory] Ni GOOGLE_API_KEY ni GOOGLE_APPLICATION_CREDENTIALS configurados — embeddings semánticos desactivados.");
+} else if (!googleApiKey && googleCredentials) {
+    console.log("[Memory] Usando GOOGLE_APPLICATION_CREDENTIALS para embeddings semánticos.");
+}
+
+/**
+ * Helper unificado para obtener un vector de embedding.
+ * Soporta: GOOGLE_API_KEY (SDK) y GOOGLE_APPLICATION_CREDENTIALS (REST + OAuth2).
+ */
+async function getEmbedding(text: string): Promise<number[] | null> {
+    // Opción 1: SDK con API Key (rápido, caché en módulo)
+    if (embeddingModel) {
+        const result = await embeddingModel.embedContent(text);
+        return result.embedding.values;
+    }
+
+    // Opción 2: REST API con Service Account (GOOGLE_APPLICATION_CREDENTIALS)
+    if (googleCredentials) {
+        try {
+            const { GoogleAuth } = await import('google-auth-library');
+            const auth = new GoogleAuth({
+                keyFilename: googleCredentials,
+                scopes: ['https://www.googleapis.com/auth/generative-language'],
+            });
+            const token = await auth.getAccessToken();
+            if (!token) return null;
+
+            const resp = await fetch(
+                'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'models/text-embedding-004',
+                        content: { parts: [{ text }] },
+                    }),
+                }
+            );
+            const data = await resp.json() as any;
+            return data?.embedding?.values ?? null;
+        } catch (e: any) {
+            console.warn('[Memory] Error obteniendo embedding via service account:', e.message);
+        }
+    }
+
+    return null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Persistencia de Trazas de Aprendizaje (LeJEPA / Self-Improving)
@@ -87,10 +141,9 @@ export async function saveTrace(userId: number, traceData: {
     try {
         // Generar embedding para búsqueda semántica (LeJEPA)
         let vector = null;
-        if (embeddingModel) {
+        if (googleApiKey || googleCredentials) {
             try {
-                const result = await embeddingModel.embedContent(traceData.user_message);
-                vector = result.embedding.values;
+                vector = await getEmbedding(traceData.user_message);
             } catch (e) {}
         }
 
@@ -121,11 +174,11 @@ export async function getSemanticContext(userId: number, query: string, category
 
         if (snapshot.empty) return "";
 
-        // Si tenemos modelo de embeddings, hacer búsqueda vectorial real
-        if (embeddingModel) {
+        // Si tenemos soporte de embeddings, hacer búsqueda vectorial real
+        if (googleApiKey || googleCredentials) {
             try {
-                const queryResult = await embeddingModel.embedContent(query);
-                const queryVector = queryResult.embedding.values;
+                const queryVector = await getEmbedding(query);
+                if (!queryVector) throw new Error('No vector');
 
                 // Calcular cosine similarity con cada traza
                 const scored = snapshot.docs
