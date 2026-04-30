@@ -47,7 +47,51 @@ export function getMessages(userId: number, limit: number = 50): MessageRow[] {
     return (stmt.all(userId, limit) as MessageRow[]).reverse();
 }
 
+
 export function clearMessages(userId: number) {
     const stmt = db.prepare('DELETE FROM messages WHERE user_id = ?');
     stmt.run(userId);
+}
+
+// ─────────────────────────────────────────────────────
+// SYNC QUEUE: Cola de reintentos para Firestore fallido
+// ─────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sync_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    failed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    attempts INTEGER DEFAULT 0
+  );
+`);
+
+export interface SyncQueueRow {
+    id: number;
+    user_id: number;
+    role: string;
+    content: string;
+    failed_at: string;
+    attempts: number;
+}
+
+export function enqueueSyncMessage(userId: number, role: string, content: string) {
+    const stmt = db.prepare('INSERT INTO sync_queue (user_id, role, content) VALUES (?, ?, ?)');
+    stmt.run(userId, role, content);
+}
+
+export function getPendingSyncMessages(): SyncQueueRow[] {
+    const stmt = db.prepare('SELECT * FROM sync_queue ORDER BY failed_at ASC LIMIT 50');
+    return stmt.all() as SyncQueueRow[];
+}
+
+export function deleteSyncMessage(id: number) {
+    const stmt = db.prepare('DELETE FROM sync_queue WHERE id = ?');
+    stmt.run(id);
+}
+
+export function incrementSyncAttempts(id: number) {
+    const stmt = db.prepare('UPDATE sync_queue SET attempts = attempts + 1 WHERE id = ?');
+    stmt.run(id);
 }

@@ -50,6 +50,10 @@ async function main() {
     initFirebase();
     initMcp();
 
+    // Iniciar worker de sincronización SQLite → Firestore en background
+    const { startSyncWorker } = await import("./memory/memoryManager.js");
+    startSyncWorker();
+
     // 3. Error handler global del bot
     bot.catch((err: any) => {
         const errMsg = err.description || err.message || "";

@@ -2,7 +2,7 @@
 import { dbFirestore } from "../config/firebase.js";
 import { FieldValue } from "firebase-admin/firestore";
 import { env } from "../config/env.js";
-import { saveMessage as saveLocal, getMessages as getLocal, MessageRow } from "./db.js";
+import { saveMessage as saveLocal, getMessages as getLocal, MessageRow, enqueueSyncMessage, getPendingSyncMessages, deleteSyncMessage, incrementSyncAttempts } from "./db.js";
 
 const COLLECTION_NAME = 'messages';
 
@@ -10,6 +10,7 @@ const COLLECTION_NAME = 'messages';
  * Sistema de memoria híbrido: Cloud (Firestore) con fallback Local (SQLite).
  */
 export async function saveMessage(userId: number, role: 'system' | 'user' | 'assistant' | 'tool', content: string) {
+    // 1. Guardar siempre en local primero (garantizado)
     saveLocal(userId, role, content);
 
     try {
@@ -20,7 +21,9 @@ export async function saveMessage(userId: number, role: 'system' | 'user' | 'ass
             timestamp: new Date(),
         });
     } catch (error) {
-        console.warn("[Memory] No se pudo sincronizar con Firestore.");
+        // Si Firestore falla, encolar para reintento posterior
+        console.warn("[Memory] Firestore no disponible. Encolando para sync posterior...");
+        enqueueSyncMessage(userId, role, content);
     }
 }
 
@@ -103,19 +106,56 @@ export async function saveTrace(userId: number, traceData: {
 }
 
 /**
- * Búsqueda de Memoria Semántica (LeJEPA inspired)
+ * Búsqueda de Memoria Semántica (LeJEPA) con Cosine Similarity real.
+ * Si GOOGLE_API_KEY no está disponible, hace fallback a búsqueda por categoría.
  */
 export async function getSemanticContext(userId: number, query: string, category: string) {
     try {
-        // Primero intentamos por categoría (fallback rápido)
+        // Recuperar trazas exitosas de la misma categoría
         const snapshot = await dbFirestore.collection('traces')
             .where('user_id', '==', userId)
             .where('category', '==', category)
             .where('success', '==', true)
-            .limit(2)
+            .limit(10)
             .get();
 
-        return snapshot.docs.map(doc => {
+        if (snapshot.empty) return "";
+
+        // Si tenemos modelo de embeddings, hacer búsqueda vectorial real
+        if (embeddingModel) {
+            try {
+                const queryResult = await embeddingModel.embedContent(query);
+                const queryVector = queryResult.embedding.values;
+
+                // Calcular cosine similarity con cada traza
+                const scored = snapshot.docs
+                    .map(doc => {
+                        const d = doc.data();
+                        const traceVector: number[] = d.embedding;
+                        if (!traceVector || traceVector.length === 0) return null;
+
+                        // Cosine similarity = dot(A,B) / (||A|| * ||B||)
+                        const dot = queryVector.reduce((sum: number, v: number, i: number) => sum + v * traceVector[i], 0);
+                        const normA = Math.sqrt(queryVector.reduce((sum: number, v: number) => sum + v * v, 0));
+                        const normB = Math.sqrt(traceVector.reduce((sum: number, v: number) => sum + v * v, 0));
+                        const similarity = dot / (normA * normB);
+
+                        return { data: d, similarity };
+                    })
+                    .filter((x): x is { data: any; similarity: number } => x !== null && x.similarity > 0.75)
+                    .sort((a, b) => b.similarity - a.similarity)
+                    .slice(0, 2);
+
+                return scored.map(({ data: d, similarity }) =>
+                    `Ejemplo de éxito (similitud: ${(similarity * 100).toFixed(0)}%): User: "${d.user_message}" -> Pensó: "${d.thought_process[0]}" -> Resultado: "${d.results[0]}"`
+                ).join('\n');
+            } catch (embeddingErr) {
+                console.warn('[Memory] Error en búsqueda vectorial, usando fallback por categoría.');
+            }
+        }
+
+        // Fallback: devolver las 2 primeras trazas exitosas por categoría
+        return snapshot.docs.slice(0, 2).map(doc => {
             const d = doc.data();
             return `Ejemplo de éxito: User: "${d.user_message}" -> Pensó: "${d.thought_process[0]}" -> Resultado: "${d.results[0]}"`;
         }).join('\n');
@@ -215,4 +255,51 @@ export async function addFactToProfile(userId: number, fact: string) {
     } catch (e) {
         console.error("[Memory] Error al guardar hecho en el perfil.");
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BACKGROUND SYNC WORKER: Reintenta subir a Firestore los mensajes fallidos
+// Se inicia automáticamente y corre cada 5 minutos.
+// ─────────────────────────────────────────────────────────────────────────────
+export function startSyncWorker() {
+    const INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+    const MAX_ATTEMPTS = 5;
+
+    const runSync = async () => {
+        const pending = getPendingSyncMessages();
+        if (pending.length === 0) return;
+
+        console.log(`[SyncWorker] Reintentando ${pending.length} mensaje(s) pendiente(s) hacia Firestore...`);
+        let successCount = 0;
+
+        for (const row of pending) {
+            try {
+                await dbFirestore.collection(COLLECTION_NAME).add({
+                    user_id: row.user_id,
+                    role: row.role,
+                    content: row.content,
+                    timestamp: new Date(row.failed_at),
+                    synced_late: true,
+                });
+                deleteSyncMessage(row.id);
+                successCount++;
+            } catch (err) {
+                incrementSyncAttempts(row.id);
+                if (row.attempts + 1 >= MAX_ATTEMPTS) {
+                    console.warn(`[SyncWorker] Mensaje ${row.id} descartado tras ${MAX_ATTEMPTS} intentos fallidos.`);
+                    deleteSyncMessage(row.id);
+                }
+            }
+        }
+
+        if (successCount > 0) {
+            console.log(`[SyncWorker] ✅ ${successCount}/${pending.length} mensajes sincronizados con Firestore.`);
+        }
+    };
+
+    // Primera ejecución inmediata (por si hay pendientes del arranque anterior)
+    setTimeout(runSync, 30_000);
+    // Ejecuciones periódicas
+    setInterval(runSync, INTERVAL_MS);
+    console.log('[SyncWorker] Worker de sincronización iniciado (cada 5 min).');
 }
