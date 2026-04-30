@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: Opengravity Telegram Webhook API
+  description: API recibida por Opengravity para procesar actualizaciones de Telegram Bot API. El sistema actúa como un servidor de webhooks configurado en Render.
+  version: 2.0.0
+servers:
+  - url: https://opengravity-xky8.onrender.com
+    description: Servidor de producción en Render
+paths:
+  /:
+    post:
+      summary: Recepción de actualizaciones de Telegram
+      description: Endpoint principal donde Telegram envía objetos Update (mensajes, clics en botones, comandos).
+      operationId: processTelegramUpdate
+      requestBody:
+        description: Objeto Update de Telegram
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramUpdate'
+            examples:
+              text_message:
+                summary: Mensaje de texto estándar
+                value:
+                  update_id: 123456789
+                  message:
+                    message_id: 1
+                    from:
+                      id: 9999999
+                      is_bot: false
+                      first_name: Rodolfo
+                    chat:
+                      id: 9999999
+                      type: private
+                    date: 1614552000
+                    text: "Hola, ¿cuáles son las noticias de hoy?"
+              callback_query:
+                summary: Clic en botón de confirmación
+                value:
+                  update_id: 123456790
+                  callback_query:
+                    id: "cb_1"
+                    from:
+                      id: 9999999
+                    message:
+                      message_id: 2
+                      text: "¿Deseas ejecutar este comando?"
+                    data: "confirm_yes"
+      responses:
+        '200':
+          description: Actualización procesada correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '403':
+          description: Acceso denegado (UserId no está en la lista blanca).
+        '500':
+          description: Error interno en el loop del agente.
+
+components:
+  schemas:
+    TelegramUpdate:
+      type: object
+      required:
+        - update_id
+      properties:
+        update_id:
+          type: integer
+          description: Identificador único de la actualización.
+        message:
+          type: object
+          properties:
+            message_id:
+              type: integer
+            text:
+              type: string
+            from:
+              $ref: '#/components/schemas/TelegramUser'
+        callback_query:
+          type: object
+          properties:
+            id:
+              type: string
+            data:
+              type: string
+            from:
+              $ref: '#/components/schemas/TelegramUser'
+    
+    TelegramUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID de Telegram del usuario (usado para validación en lista blanca).
+        is_bot:
+          type: boolean
+        first_name:
+          type: string

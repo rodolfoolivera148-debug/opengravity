@@ -11,12 +11,13 @@
   "completed": [
     "reconhecimento",
     "escavacao",
-    "interpretacao"
-  ],
-  "pending": [
+    "interpretacao",
     "geracao",
     "revisao"
   ],
+  "pending": [],
+
+
   "checkpoints": {
     "scout": {
       "completed_at": "2026-04-30T17:26:00Z",
@@ -115,7 +116,12 @@
       "sdd/bot-telegram-interface.md",
       "sdd/memory-persistence-layer.md",
       "sdd/trendradar-mcp-server.md",
-      "sdd/config-infrastructure.md"
+      "sdd/config-infrastructure.md",
+      "openapi/telegram-webhook.yaml",
+      "user-stories/ai-autonomous-research.md",
+      "user-stories/system-self-healing.md",
+      "user-stories/human-in-the-loop-approval.md",
+      "traceability/code-spec-matrix.md"
     ],
     "total": 10
   }

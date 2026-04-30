@@ -20,7 +20,8 @@ La capa de memoria de Opengravity es un sistema híbrido que gestiona el histori
 ## Regras de Negócio
 
 - **Priorización de Éxito**: Solo las trazas marcadas como `success: true` se recuperan para el contexto semántico (LeJEPA). 🟢
-- **Sincronización Fallback**: Si Firestore no está disponible, el sistema opera solo con SQLite local y marca los registros para sincronización posterior. 🔴 (Inferido como intención, implementación parcial).
+- **Sincronización Fallback**: El sistema guarda en local primero, pero no existe re-sincronización automática de pendientes si Firestore falla. 🔴 (Pendiente)
+- **Búsqueda Vectorial**: Se generan embeddings, pero la recuperación por similitud de vectores no está implementada en el código actual. 🔴 (Pendiente)
 - **Límite de Historial**: La recuperación de mensajes para el prompt está limitada a los últimos 5 turnos para optimizar TPM. 🟢
 - **Long-term Fact Storage**: Los hechos guardados mediante `save_user_fact` no expiran y se inyectan siempre en el system prompt. 🟢
 
@@ -49,9 +50,9 @@ La capa de memoria de Opengravity es un sistema híbrido que gestiona el histori
 
 | Tipo | Requisito inferido | Evidência no código | Confianza |
 | :--- | :--- | :--- | :---: |
-| Disponibilidad | Redundancia local + Cloud para operación offline parcial. | `src/memory/memoryManager.ts` | 🟡 |
-| Performance | Búsqueda vectorial para recuperación de contexto relevante. | `src/memory/memoryManager.ts:165` | 🟢 |
-| Escalabilidad | Uso de búsqueda semántica en lugar de historial infinito (ahorro de tokens). | `src/agent/loop.ts:49` | 🟢 |
+| Disponibilidad | Redundancia local + Cloud para operación offline parcial. | `src/memory/memoryManager.ts` | 🟢 |
+| Performance | Generación de vectores Gemini para trazas. | `src/memory/memoryManager.ts:89` | 🟢 |
+| Escalabilidad | Uso de búsqueda por categoría (Pendiente: búsqueda vectorial). | `src/memory/memoryManager.ts:113` | 🟡 |
 | Integridad | Validación de esquemas mediante tipos de TypeScript estrictos. | `src/memory/types.ts` | 🟢 |
 
 ## Critérios de Aceitação

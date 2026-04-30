@@ -36,7 +36,7 @@ TrendRadar es el subsistema de inteligencia externa de Opengravity. Operando com
 
 ## Fluxos Alternativos
 
-- **Búsqueda sin resultados en DB:** TrendRadar puede disparar un rastreo inmediato ("crawler on-demand") para las fuentes más críticas si la consulta no devuelve resultados históricos. 🔴 (Inferido como capacidad deseada).
+- **Búsqueda sin resultados en DB:** El Agente puede disparar un rastreo inmediato mediante `trigger_crawl` con total autonomía si la consulta no devuelve resultados históricos. 🟢 (Confirmado por el usuario)
 - **Error de interpretación de fecha:** Si la expresión temporal es ambigua, TrendRadar devuelve el error amigable solicitando aclaración al Agente.
 
 ## Dependências
