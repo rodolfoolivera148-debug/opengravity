@@ -1,0 +1,248 @@
+{
+  "generated_at": "2026-04-30T17:29:40Z",
+  "modules": [
+    {
+      "name": "agent",
+      "path": "src/agent",
+      "purpose": "Núcleo de razonamiento autónomo e integración con LLMs y protocolos MCP.",
+      "primary_files": [
+        "src/agent/loop.ts",
+        "src/agent/mcpClient.ts",
+        "src/agent/tools.ts",
+        "src/agent/auditor.ts"
+      ],
+      "functions": [
+        {
+          "name": "runAgentLoop",
+          "file": "src/agent/loop.ts",
+          "params": ["userId: number", "userMessage: string"],
+          "returns": "Promise<string>",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "executeTool",
+          "file": "src/agent/tools.ts",
+          "params": ["name: string", "args: Record<string, any>", "userId: number"],
+          "returns": "Promise<string>",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "runFailureAudit",
+          "file": "src/agent/auditor.ts",
+          "params": ["userId: number"],
+          "returns": "Promise<void>",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Trace",
+          "fields": [
+            { "name": "category", "type": "string", "required": true },
+            { "name": "user_message", "type": "string", "required": true },
+            { "name": "thought_process", "type": "string[]", "required": true },
+            { "name": "tool_calls", "type": "any[]", "required": true },
+            { "name": "results", "type": "string[]", "required": true },
+            { "name": "success", "type": "boolean", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Límite máximo de 12 iteraciones por pensamiento",
+          "location": "src/agent/loop.ts:12",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Confirmación de usuario requerida para acciones sensibles (execute_terminal_command, etc.)",
+          "location": "src/agent/loop.ts:219",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Autotranslación de consultas TrendRadar de español a inglés",
+          "location": "src/agent/mcpClient.ts:381",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": ["memory", "bot", "config"],
+      "algorithms": ["Context-Budget-Aware Tool Filtering", "Dynamic Context Reduction (413 recovery)"],
+      "complexity": "high"
+    },
+    {
+      "name": "bot",
+      "path": "src/bot",
+      "purpose": "Interfaz de usuario vía Telegram y gestión de confirmaciones críticas.",
+      "primary_files": [
+        "src/bot/telegram.ts"
+      ],
+      "functions": [
+        {
+          "name": "requestConfirmation",
+          "file": "src/bot/telegram.ts",
+          "params": ["userId: number", "toolName: string", "args: any"],
+          "returns": "Promise<boolean>",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "sendRobustMessage",
+          "file": "src/bot/telegram.ts",
+          "params": ["ctx: any", "content: string"],
+          "returns": "Promise<void>",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "PendingConfirmation",
+          "fields": [
+            { "name": "id", "type": "string", "required": true },
+            { "name": "resolver", "type": "function", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Timeout de 5 minutos para confirmaciones humanas",
+          "location": "src/bot/telegram.ts:38",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Solo usuarios permitidos en TELEGRAM_ALLOWED_USER_IDS pueden interactuar",
+          "location": "src/bot/telegram.ts:101",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": ["agent", "config", "memory"],
+      "algorithms": ["Non-blocking Confirmation Pattern (Promise Resolver Map)"],
+      "complexity": "medium"
+    },
+    {
+      "name": "memory",
+      "path": "src/memory",
+      "purpose": "Sistema de persistencia híbrido, memoria semántica y gestión de perfil de usuario.",
+      "primary_files": [
+        "src/memory/memoryManager.ts",
+        "src/memory/db.ts"
+      ],
+      "functions": [
+        {
+          "name": "saveTrace",
+          "file": "src/memory/memoryManager.ts",
+          "params": ["userId: number", "traceData: any"],
+          "returns": "Promise<void>",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "getSemanticContext",
+          "file": "src/memory/memoryManager.ts",
+          "params": ["userId: number", "query: string", "category: string"],
+          "returns": "Promise<string>",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Message",
+          "fields": [
+            { "name": "user_id", "type": "number", "required": true },
+            { "name": "role", "type": "string", "required": true },
+            { "name": "content", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Uso de SQLite in-memory si se detecta entorno nube (WEBHOOK_URL)",
+          "location": "src/memory/db.ts:9",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Fallback automático a base de datos local si Firestore falla",
+          "location": "src/memory/memoryManager.ts:45",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": ["config"],
+      "algorithms": ["Semantic Retrieval (LeJEPA inspired)", "Hybrid Cloud-Local Sync"],
+      "complexity": "medium"
+    },
+    {
+      "name": "config",
+      "path": "src/config",
+      "purpose": "Gestión de variables de entorno, validación de esquemas y conexión con Firebase.",
+      "primary_files": [
+        "src/config/env.ts",
+        "src/config/firebase.ts"
+      ],
+      "functions": [],
+      "entities": [
+        {
+          "name": "EnvConfig",
+          "fields": [
+            { "name": "TELEGRAM_BOT_TOKEN", "type": "string", "required": true },
+            { "name": "TELEGRAM_ALLOWED_USER_IDS", "type": "number[]", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Falla crítica si las variables de entorno no cumplen el esquema Zod",
+          "location": "src/config/env.ts:24",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": [],
+      "algorithms": ["Strict Zod Schema Validation"],
+      "complexity": "low"
+    },
+    {
+      "name": "trendradar",
+      "path": "trendradar",
+      "purpose": "Servidor MCP de inteligencia de tendencias web (OSINT).",
+      "primary_files": [
+        "trendradar/mcp_server/server.py",
+        "trendradar/config/config.yaml"
+      ],
+      "functions": [
+        {
+          "name": "resolve_date_range",
+          "file": "trendradar/mcp_server/server.py",
+          "params": ["expression: string"],
+          "returns": "Promise<string>",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "search_news",
+          "file": "trendradar/mcp_server/server.py",
+          "params": ["query: string", "include_rss: boolean"],
+          "returns": "Promise<string>",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "NewsItem",
+          "fields": [
+            { "name": "title", "type": "string", "required": true },
+            { "name": "platform", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Conversión de expresiones de fecha naturales a ISO constantes",
+          "location": "trendradar/mcp_server/server.py:122",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": [],
+      "algorithms": ["String Similarity News Aggregation", "Multi-platform OSINT Crawling"],
+      "complexity": "high"
+    }
+  ]
+}

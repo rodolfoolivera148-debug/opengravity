@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-04-30T17:25:00Z",
+  "project_root": "c:/Users/Rodolfo Olivera/Desktop/Opengravity",
+  "languages": [
+    { "name": "TypeScript", "extensions": [".ts", ".tsx"], "file_count": 50 },
+    { "name": "Python", "extensions": [".py"], "file_count": 20 },
+    { "name": "JavaScript", "extensions": [".js", ".cjs", ".mjs"], "file_count": 10 },
+    { "name": "JSON", "extensions": [".json"], "file_count": 30 }
+  ],
+  "primary_language": "TypeScript",
+  "frameworks": [
+    { "name": "Grammy", "version": "^1.32.0", "source": "package.json" },
+    { "name": "Firebase", "version": "^12.10.0", "source": "package.json" },
+    { "name": "Model Context Protocol", "version": "^1.27.1", "source": "package.json" },
+    { "name": "Express", "version": "^5.2.1", "source": "package.json" },
+    { "name": "React Native", "version": "0.0.1", "source": "OpengravityApp/package.json" },
+    { "name": "FastMCP", "version": "2.12.5", "source": "trendradar/pyproject.toml" }
+  ],
+  "package_manager": "npm",
+  "entry_points": [
+    { "path": "src/index.ts", "type": "main_entry" },
+    { "path": "src/bot/telegram.ts", "type": "bot_entry" },
+    { "path": "src/agent/loop.ts", "type": "agent_loop" }
+  ],
+  "config_files": [
+    "package.json",
+    "tsconfig.json",
+    "firebase.json",
+    ".env",
+    ".firebaserc"
+  ],
+  "docker": {
+    "dockerfile": "Dockerfile"
+  },
+  "database_hints": [
+    { "path": "src/memory/db.ts", "type": "better-sqlite3" },
+    { "path": "firestore.rules", "type": "firebase_rules" }
+  ],
+  "total_files": 150,
+  "modules": [
+    "src/agent",
+    "src/bot",
+    "src/memory",
+    "src/config",
+    "trendradar",
+    "OpengravityApp"
+  ]
+}

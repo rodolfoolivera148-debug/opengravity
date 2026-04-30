@@ -1,0 +1,122 @@
+{
+  "version": "1.2.14",
+  "project": "Opengravity",
+  "user_name": "Rodolfo",
+  "chat_language": "es",
+  "doc_language": "español",
+  "answer_mode": "chat",
+  "doc_level": "detalhado",
+  "output_folder": "_reversa_sdd",
+  "phase": "interpretacao",
+  "completed": [
+    "reconhecimento",
+    "escavacao",
+    "interpretacao"
+  ],
+  "pending": [
+    "geracao",
+    "revisao"
+  ],
+  "checkpoints": {
+    "scout": {
+      "completed_at": "2026-04-30T17:26:00Z",
+      "files": [
+        "_reversa_sdd/inventory.md",
+        "_reversa_sdd/dependencies.md",
+        ".reversa/context/surface.json"
+      ]
+    },
+    "archaeologist": {
+      "completed_at": "2026-04-30T17:29:50Z",
+      "modules_analyzed": [
+        "agent",
+        "bot",
+        "memory",
+        "config",
+        "trendradar",
+        "OpengravityApp"
+      ],
+      "modules_pending": [],
+      "files": [
+        "_reversa_sdd/code-analysis.md",
+        "_reversa_sdd/data-dictionary.md",
+        "_reversa_sdd/flowcharts/agent.md",
+        "_reversa_sdd/flowcharts/agent-loop.md",
+        "_reversa_sdd/flowcharts/bot.md",
+        "_reversa_sdd/flowcharts/memory.md",
+        ".reversa/context/modules.json"
+      ]
+    },
+    "detective": {
+      "completed_at": "2026-04-30T17:51:20Z",
+      "files": [
+        "_reversa_sdd/domain.md",
+        "_reversa_sdd/state-machines.md",
+        "_reversa_sdd/permissions.md",
+        "_reversa_sdd/adrs/0001-context-budgeting.md",
+        "_reversa_sdd/adrs/0002-failure-audit.md"
+      ]
+    },
+    "architect": {
+      "completed_at": "2026-04-30T17:54:00Z",
+      "files": [
+        "_reversa_sdd/architecture.md",
+        "_reversa_sdd/c4-context.md",
+        "_reversa_sdd/c4-containers.md",
+        "_reversa_sdd/erd-complete.md",
+        "_reversa_sdd/deployment.md"
+      ]
+    }
+  },
+  "engines": [
+    "gemini-cli",
+    "antigravity",
+    "opencode"
+  ],
+  "agents": [
+    "reversa",
+    "reversa-scout",
+    "reversa-archaeologist",
+    "reversa-detective",
+    "reversa-architect",
+    "reversa-writer",
+    "reversa-reviewer",
+    "reversa-visor",
+    "reversa-data-master",
+    "reversa-design-system",
+    "reversa-agents-help",
+    "reversa-reconstructor"
+  ],
+  "created_files": [
+    ".agents\\skills\\reversa",
+    ".agents\\skills\\reversa-scout",
+    ".agents\\skills\\reversa-archaeologist",
+    ".agents\\skills\\reversa-detective",
+    ".agents\\skills\\reversa-architect",
+    ".agents\\skills\\reversa-writer",
+    ".agents\\skills\\reversa-reviewer",
+    ".agents\\skills\\reversa-visor",
+    ".agents\\skills\\reversa-data-master",
+    ".agents\\skills\\reversa-design-system",
+    ".agents\\skills\\reversa-agents-help",
+    ".agents\\skills\\reversa-reconstructor",
+    "GEMINI.md",
+    "AGENTS.md",
+    ".reversa\\state.json",
+    ".reversa\\config.toml",
+    ".reversa\\config.user.toml",
+    ".reversa\\plan.md",
+    ".reversa\\version",
+    ".reversa\\_config\\manifest.yaml"
+  ],
+  "redator_progress": {
+    "completed": [
+      "sdd/agent-reasoning-core.md",
+      "sdd/bot-telegram-interface.md",
+      "sdd/memory-persistence-layer.md",
+      "sdd/trendradar-mcp-server.md",
+      "sdd/config-infrastructure.md"
+    ],
+    "total": 10
+  }
+}
